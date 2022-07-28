@@ -1,0 +1,9 @@
+# VS Code
+.vscode
+
+
+# ESP related
+
+build
+
+sdkconfig
