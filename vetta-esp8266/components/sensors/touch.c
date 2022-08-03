@@ -1,14 +1,9 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/FreeRTOSConfig.h"
+#include "freertos/task.h"
 #include "driver/adc.h"
 #include "esp_log.h"
-#include "utils.h"
 #include "touch.h"
-
-static uint16_t _samples[READING_SAMPLES_POOL_SIZE] = {0};
-static size_t _index = 0;
-
-static long int _total = 0;
-
-static int _average = 0;
 
 static long int idle_reading = 0;
 
@@ -28,7 +23,7 @@ static unsigned char wait_for_calibration(void)
     time_t start_time = 0;
     long int prev_value = 0, count = 0;
 
-    while(start_time < CALIBRATION_TIMEOUT_MILLIS || count >= CALIBRATION_SAMPLES)
+    while(start_time < CALIBRATION_TIMEOUT_MILLIS || count < CALIBRATION_SAMPLES)
     {
         if(!(prev_value = read_sensor_analog()))
         {
@@ -58,4 +53,16 @@ esp_err_t init_touch_sensor_module(void)
     {return ESP_OK;}
 
     return _err;
+}
+
+
+unsigned char is_touch(uint16_t analog_value)
+{
+    if(analog_value > idle_reading || analog_value == DEFAULT_SENSOR_READING_VALUE)
+    {
+        return 0;
+    }
+
+    return TOUCH_DETECTION_MIN_DELTA <= (idle_reading - analog_value) &&
+            (idle_reading - analog_value) <= TOUCH_DETECTION_MAX_DELTA ? 1 : 0;
 }

@@ -43,5 +43,10 @@ esp_err_t led_medium(void);
 */
 esp_err_t led_high(void);
 
+/*  Switch the led next state (non-thread safe)
+@return @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+*/
+esp_err_t led_set_next(void);
+
 #define _VETTA_LED_H
 #endif // _VETTA_LED_H

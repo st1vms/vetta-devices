@@ -3,6 +3,7 @@
 #include "driver/pwm.h"
 #include "led.h"
 
+static uint32_t _current_state;
 
 esp_err_t init_led_module(void)
 {
@@ -51,3 +52,41 @@ esp_err_t led_low(void) {return set_duty(LED_LOW_DUTY_CYCLE);}
 esp_err_t led_medium(void) {return set_duty(LED_MEDIUM_DUTY_CYCLE);};
 
 esp_err_t led_high(void){return set_duty(LED_HIGH_DUTY_CYCLE);};
+
+esp_err_t led_set_next(void)
+{
+    switch (_current_state)
+    {
+    case LED_OFF_DUTY_CYCLE:
+        if(ESP_OK == set_duty(LED_LOW_DUTY_CYCLE))
+        {
+            _current_state = LED_LOW_DUTY_CYCLE;
+            return ESP_OK;
+        }
+        break;
+    case LED_LOW_DUTY_CYCLE:
+        if(ESP_OK == set_duty(LED_MEDIUM_DUTY_CYCLE))
+        {
+            _current_state = LED_MEDIUM_DUTY_CYCLE;
+            return ESP_OK;
+        }
+        break;
+    case LED_MEDIUM_DUTY_CYCLE:
+        if(ESP_OK == set_duty(LED_HIGH_DUTY_CYCLE))
+        {
+            _current_state = LED_HIGH_DUTY_CYCLE;
+            return ESP_OK;
+        }
+        break;
+    case LED_HIGH_DUTY_CYCLE:
+        if(ESP_OK == set_duty(LED_OFF_DUTY_CYCLE))
+        {
+            _current_state = LED_OFF_DUTY_CYCLE;
+            return ESP_OK;
+        }
+        break;
+    default:
+        break;
+    }
+    return ESP_FAIL;
+}
