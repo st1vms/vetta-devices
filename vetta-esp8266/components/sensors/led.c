@@ -1,6 +1,7 @@
 #include "esp8266/gpio_register.h"
 #include "esp8266/pin_mux_register.h"
 #include "driver/pwm.h"
+#include "esp_log.h"
 #include "led.h"
 
 static uint32_t _current_state;

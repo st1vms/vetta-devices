@@ -3,42 +3,54 @@
 #include "freertos/task.h"
 #include "driver/adc.h"
 #include "esp_log.h"
+#include <stdio.h>
 #include "touch.h"
 
-static long int idle_reading = 0;
 
 uint16_t read_sensor_analog(void)
 {
     static uint16_t _input_value;
-    _input_value = idle_reading;
+    _input_value = DEFAULT_SENSOR_READING_VALUE;
     if(ESP_OK == adc_read(&_input_value))
     {
         return _input_value;
     }
-    return idle_reading;
+    return DEFAULT_SENSOR_READING_VALUE;
 }
 
-static unsigned char wait_for_calibration(void)
+uint16_t calibrate_idle(void)
 {
-    time_t start_time = 0;
-    long int prev_value = 0, count = 0;
+    static time_t time_offset;
+    time_offset = 0;
 
-    while(start_time < CALIBRATION_TIMEOUT_MILLIS || count < CALIBRATION_SAMPLES)
+    static uint16_t res;
+    res = DEFAULT_SENSOR_READING_VALUE;
+
+    static uint16_t prev;
+
+    for(;;)
     {
-        if(!(prev_value = read_sensor_analog()))
-        {
-            return 0;
-        }else if(prev_value != idle_reading)
-        {
-            idle_reading = prev_value;
-        }else{count++;}
+        prev = res;
 
-        DELAY_MILLIS(READING_DELAY_MILLIS);
-        start_time += READING_DELAY_MILLIS;
+        if(!(res = read_sensor_analog()))
+        {
+            break;
+        }
+
+        if(time_offset >= CALIBRATION_DELAY_MILLIS &&
+            // Inclusive range test
+            (res >= prev - CALIBRATION_ACCURACY_DELTA && res <= prev + CALIBRATION_ACCURACY_DELTA))
+        {
+            return res;
+        }
+
+        TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
+        time_offset += READING_DELAY_MILLIS;
     }
 
-    return 1;
+    return DEFAULT_SENSOR_READING_VALUE;
 }
+
 
 esp_err_t init_touch_sensor_module(void)
 {
@@ -49,20 +61,20 @@ esp_err_t init_touch_sensor_module(void)
 
     static esp_err_t _err;
 
-    if(ESP_OK == ( _err = adc_init(&_analog_input_pin_config)) && wait_for_calibration())
+    if(ESP_OK == ( _err = adc_init(&_analog_input_pin_config)))
     {return ESP_OK;}
 
     return _err;
 }
 
 
-unsigned char is_touch(uint16_t analog_value)
+unsigned char is_touch(uint16_t analog_value, uint16_t calibrated_idle_read)
 {
-    if(analog_value > idle_reading || analog_value == DEFAULT_SENSOR_READING_VALUE)
+    if(analog_value > calibrated_idle_read || analog_value == DEFAULT_SENSOR_READING_VALUE)
     {
         return 0;
     }
 
-    return TOUCH_DETECTION_MIN_DELTA <= (idle_reading - analog_value) &&
-            (idle_reading - analog_value) <= TOUCH_DETECTION_MAX_DELTA ? 1 : 0;
+    return TOUCH_DETECTION_MIN_DELTA <= (calibrated_idle_read - analog_value) &&
+            (calibrated_idle_read - analog_value) <= TOUCH_DETECTION_MAX_DELTA ? 1 : 0;
 }
