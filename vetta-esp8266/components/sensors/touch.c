@@ -2,8 +2,6 @@
 #include "freertos/FreeRTOSConfig.h"
 #include "freertos/task.h"
 #include "driver/adc.h"
-#include "esp_log.h"
-#include <stdio.h>
 #include "touch.h"
 
 
