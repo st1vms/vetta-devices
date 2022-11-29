@@ -40,7 +40,7 @@ static TaskHandle_t capSensorTask = NULL;
 
 static void led_updater_task(void * params)
 {
-    uint32_t ledNotificationValue;
+    static uint32_t ledNotificationValue;
 
     for(;;)
     {
@@ -95,7 +95,7 @@ static void capacitive_sensor_task(void * params)
             xTaskNotifyGive(ledUpdaterTask);
         }
 
-       TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
+        TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
 
         if(time_offset >= CAPACITIVE_SENSOR_LED_NOTIFY_DELAY)
         {
