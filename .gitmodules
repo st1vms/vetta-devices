@@ -1,4 +1,4 @@
 [submodule "ESP8266-RTOS-SDK-vetta-fork"]
 	path = ESP8266-RTOS-SDK-vetta-fork
-	url = https://github.com/st1vms/ESP8266-RTOS-SDK-vetta-fork
+	url = https://github.com/st1vms/ESP8266-RTOS-SDK-vetta-fork.git
 	branch = master
