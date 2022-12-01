@@ -82,12 +82,11 @@ static void capacitive_sensor_task(void *params)
     static time_t time_offset;
     time_offset = 0;
 
+    static unsigned char can_update_led;
+    can_update_led = 0;
+
     for (;;)
     {
-
-        TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
-        time_offset += (time_offset >= CAPACITIVE_SENSOR_LED_NOTIFY_DELAY) ? 0 : READING_DELAY_MILLIS;
-
         total -= samples[ix];
         if ((samples[ix] = read_sensor_analog()) > 0)
         {
@@ -95,14 +94,23 @@ static void capacitive_sensor_task(void *params)
             ix = (ix == READING_SAMPLES_POOL_SIZE) ? 0 : ix;
 
             if (samples[READING_SAMPLES_POOL_SIZE] != 0 &&
-                time_offset >= CAPACITIVE_SENSOR_LED_NOTIFY_DELAY &&
+                can_update_led &&
                 is_touch(total / READING_SAMPLES_POOL_SIZE, idle_read))
             {
+                can_update_led = 0;
                 time_offset = 0;
                 // send led update event from sensor task
                 xTaskNotify(ledUpdaterTask, (1UL << CAPACITIVE_SENSOR_LED_NOTIFICATION_VALUE), eSetBits);
             }
         }
+
+        TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
+
+        if(time_offset >= CAPACITIVE_SENSOR_LED_NOTIFY_DELAY){
+            can_update_led = 1;
+            continue;
+        }
+        time_offset += READING_DELAY_MILLIS;
     }
 }
 
@@ -148,8 +156,11 @@ static void event_handler(void *arg, esp_event_base_t event_base,
 
         if (evt->type == ESP_SMARTCONFIG_TYPE && ESP_OK == esp_smartconfig_get_rvd_data(rvd_data, sizeof(rvd_data)))
         {
+            ESP_LOGI("tsk", "\nreserved data: ");
             // Received esptouch reserved data
-            ESP_LOGI("tsk", "\nreserved data: %s\n", rvd_data);
+            for(int i = 0; i < 33; i++){
+                ESP_LOGI("tsk", "0x%02x ", rvd_data[i]);
+            }
         }
 
         esp_wifi_disconnect();
