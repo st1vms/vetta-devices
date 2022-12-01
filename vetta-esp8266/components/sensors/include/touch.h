@@ -18,13 +18,13 @@ extern "C" {
 
 #define CALIBRATION_ACCURACY_DELTA          (1)
 
-#define TOUCH_DETECTION_MIN_DELTA           (10)
-#define TOUCH_DETECTION_MAX_DELTA           (100)
-
+#define TOUCH_DETECTION_MIN_DELTA           (8)
+#define TOUCH_DETECTION_MAX_DELTA           (300)
 
 #ifndef CONFIG_FREERTOS_HZ
 #define CONFIG_FREERTOS_HZ  (100)   //menuconfig -> component config -> FreeRTOS -> Tick rate (hz)
 #endif //CONFIG_FREERTOS_HZ
+
 static inline void TIME_DELAY_MILLIS(long int x) {vTaskDelay(x / portTICK_PERIOD_MS);};
 
 /* Configures capacitive touch sensor module (non-thread safe)

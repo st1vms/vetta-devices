@@ -30,20 +30,19 @@ uint16_t calibrate_idle(void)
     {
         prev = res;
 
-        if(!(res = read_sensor_analog()))
-        {
-            break;
-        }
-
-        if(time_offset >= CALIBRATION_DELAY_MILLIS &&
-            // Inclusive range test
-            (res >= prev - CALIBRATION_ACCURACY_DELTA && res <= prev + CALIBRATION_ACCURACY_DELTA))
-        {
-            return res;
-        }
-
         TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
         time_offset += READING_DELAY_MILLIS;
+
+        if(!(res = read_sensor_analog()))
+        {break;}
+
+        // Inclusive range test
+        if (res >= prev - CALIBRATION_ACCURACY_DELTA && res <= prev + CALIBRATION_ACCURACY_DELTA)
+        {
+            if(time_offset >= CALIBRATION_DELAY_MILLIS){
+                return res;
+            }
+        }else{time_offset = 0;}
     }
 
     return DEFAULT_SENSOR_READING_VALUE;
@@ -73,6 +72,6 @@ unsigned char is_touch(uint16_t analog_value, uint16_t calibrated_idle_read)
         return 0;
     }
 
-    return TOUCH_DETECTION_MIN_DELTA <= (calibrated_idle_read - analog_value) &&
-            (calibrated_idle_read - analog_value) <= TOUCH_DETECTION_MAX_DELTA ? 1 : 0;
+    return (TOUCH_DETECTION_MIN_DELTA <= (calibrated_idle_read - analog_value) &&
+            (calibrated_idle_read - analog_value) <= TOUCH_DETECTION_MAX_DELTA) ? 1 : 0;
 }
