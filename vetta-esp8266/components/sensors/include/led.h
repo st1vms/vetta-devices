@@ -2,6 +2,10 @@
 
 #include "esp_err.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define PWM_PERIOD                  (1000)      // 1 kHz
 #define PWM_CHANNEL                 (0)         // 1 for output led channel
 
@@ -47,6 +51,10 @@ esp_err_t led_high(void);
 @return @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
 */
 esp_err_t led_set_next(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #define _VETTA_LED_H
 #endif // _VETTA_LED_H

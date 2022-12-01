@@ -2,6 +2,10 @@
 
 #include "esp_err.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CAPACITIVE_SENSOR_GPIO_OUTPUT       (12)    //  Output pin D6
 
 #define DEFAULT_SENSOR_READING_VALUE        (0)
@@ -44,6 +48,10 @@ uint16_t calibrate_idle(void);
 @return 1 in case of positive evaluation ( touch detected ), 0 otherwise
 */
 unsigned char is_touch(uint16_t analog_value, uint16_t calibrated_idle_read);
+
+#ifdef __cplusplus
+}
+#endif
 
 #define _VETTA_TOUCH_H
 #endif // _VETTA_TOUCH_H
