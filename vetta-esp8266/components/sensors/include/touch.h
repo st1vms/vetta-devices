@@ -6,8 +6,6 @@
 extern "C" {
 #endif
 
-#define CAPACITIVE_SENSOR_GPIO_OUTPUT       (12)    //  Output pin D6
-
 #define DEFAULT_SENSOR_READING_VALUE        (0)
 
 #define READING_SAMPLES_POOL_SIZE           (20)
@@ -18,8 +16,9 @@ extern "C" {
 
 #define CALIBRATION_ACCURACY_DELTA          (1)
 
-#define TOUCH_DETECTION_MIN_DELTA           (8)
-#define TOUCH_DETECTION_MAX_DELTA           (300)
+#define TOUCH_DETECTION_MIN_DELTA           (5)
+#define TOUCH_DETECTION_MAX_DELTA           (200)
+
 
 #ifndef CONFIG_FREERTOS_HZ
 #define CONFIG_FREERTOS_HZ  (100)   //menuconfig -> component config -> FreeRTOS -> Tick rate (hz)
