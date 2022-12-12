@@ -21,7 +21,6 @@ static TaskHandle_t ledUpdaterTask = NULL;
 static TaskHandle_t capSensorTask = NULL;
 static TaskHandle_t networkTask = NULL;
 
-
 static void led_updater_task(void *params)
 {
     static uint32_t ledNotificationValue;
@@ -50,7 +49,7 @@ static void led_updater_task(void *params)
 static void capacitive_sensor_task(void *params)
 {
     static uint16_t idle_read;
-    idle_read = calibrate_idle();
+    idle_read = 0;
 
     static uint16_t samples[READING_SAMPLES_POOL_SIZE] = {0};
     static size_t ix;
@@ -72,13 +71,22 @@ static void capacitive_sensor_task(void *params)
         {
             total += samples[ix++];
 
-            /* if(can_update_led){
-                printf("s : %d , c %d\n", total / READING_SAMPLES_POOL_SIZE, idle_read);
-            } */
+            // Logs capacitive sensor readings
+            /*
+            if(idle_read != 0){
+                printf("\nt:%u , idle: %u\n", total / READING_SAMPLES_POOL_SIZE, idle_read );
+            }
+            */
 
-            ix = (ix == READING_SAMPLES_POOL_SIZE) ? 0 : ix;
+            if(ix == READING_SAMPLES_POOL_SIZE){
+                if(idle_read == 0){
+                    idle_read = total / READING_SAMPLES_POOL_SIZE;
+                }
+                ix = 0;
+            }
 
             if (samples[READING_SAMPLES_POOL_SIZE] != 0 &&
+                idle_read != 0 &&
                 can_update_led &&
                 is_touch(total / READING_SAMPLES_POOL_SIZE, idle_read))
             {
@@ -168,14 +176,6 @@ void app_main()
     else
     {
 
-        // Create capacitive sensor task
-        xTaskCreate(capacitive_sensor_task,
-                    "sensor_task",
-                    CAPACITIVE_SENSOR_TASK_STACK_DEPTH,
-                    NULL,
-                    CAPACITIVE_SENSOR_TASK_PRIORITY,
-                    &capSensorTask);
-
         // Create led updater task
         xTaskCreate(led_updater_task,
                     "led_task",
@@ -183,6 +183,14 @@ void app_main()
                     NULL,
                     LED_SENSOR_TASK_PRIORITY,
                     &ledUpdaterTask);
+
+        // Create capacitive sensor task
+        xTaskCreate(capacitive_sensor_task,
+                    "sensor_task",
+                    CAPACITIVE_SENSOR_TASK_STACK_DEPTH,
+                    NULL,
+                    CAPACITIVE_SENSOR_TASK_PRIORITY,
+                    &capSensorTask);
 
         // Create button task
         xTaskCreate(network_task,

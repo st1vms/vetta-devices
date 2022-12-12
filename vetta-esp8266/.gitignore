@@ -8,3 +8,9 @@ build
 
 sdkconfig
 sdkconfig.*
+
+
+# Vetta related
+output_creds
+
+spiffs_image/*

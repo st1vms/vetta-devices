@@ -12,13 +12,7 @@ extern "C" {
 
 #define READING_DELAY_MILLIS                (10)
 
-#define CALIBRATION_DELAY_MILLIS            (200)
-
-#define CALIBRATION_ACCURACY_DELTA          (1)
-
-#define TOUCH_DETECTION_MIN_DELTA           (5)
-#define TOUCH_DETECTION_MAX_DELTA           (200)
-
+#define TOUCH_DETECTION_TRESHOLD            (5)
 
 #ifndef CONFIG_FREERTOS_HZ
 #define CONFIG_FREERTOS_HZ  (100)   //menuconfig -> component config -> FreeRTOS -> Tick rate (hz)
@@ -35,11 +29,6 @@ esp_err_t init_touch_sensor_module(void);
 @return Capacitive sensor analog reading, as a 16 bit unsigned integer
 */
 uint16_t read_sensor_analog(void);
-
-/* This function will block until the sensor identify the idle analog reading value
-@return calibrated analog reading
-*/
-uint16_t calibrate_idle(void);
 
 /*
 @param analog_value sensor reading value to check for touch

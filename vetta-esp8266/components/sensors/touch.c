@@ -1,3 +1,4 @@
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/FreeRTOSConfig.h"
 #include "freertos/task.h"
@@ -15,39 +16,6 @@ uint16_t read_sensor_analog(void)
     }
     return DEFAULT_SENSOR_READING_VALUE;
 }
-
-uint16_t calibrate_idle(void)
-{
-    static time_t time_offset;
-    time_offset = 0;
-
-    static uint16_t res;
-    res = DEFAULT_SENSOR_READING_VALUE;
-
-    static uint16_t prev;
-
-    for(;;)
-    {
-        prev = res;
-
-        TIME_DELAY_MILLIS(READING_DELAY_MILLIS);
-        time_offset += READING_DELAY_MILLIS;
-
-        if(!(res = read_sensor_analog()))
-        {break;}
-
-        // Inclusive range test
-        if (res >= prev - CALIBRATION_ACCURACY_DELTA && res <= prev + CALIBRATION_ACCURACY_DELTA)
-        {
-            if(time_offset >= CALIBRATION_DELAY_MILLIS){
-                return res;
-            }
-        }else{time_offset = 0;}
-    }
-
-    return DEFAULT_SENSOR_READING_VALUE;
-}
-
 
 esp_err_t init_touch_sensor_module(void)
 {
@@ -67,11 +35,10 @@ esp_err_t init_touch_sensor_module(void)
 
 unsigned char is_touch(uint16_t analog_value, uint16_t calibrated_idle_read)
 {
-    if(analog_value > calibrated_idle_read || analog_value == DEFAULT_SENSOR_READING_VALUE)
+    if(analog_value == DEFAULT_SENSOR_READING_VALUE)
     {
         return 0;
     }
 
-    return (TOUCH_DETECTION_MIN_DELTA <= (calibrated_idle_read - analog_value) &&
-            (calibrated_idle_read - analog_value) <= TOUCH_DETECTION_MAX_DELTA) ? 1 : 0;
+    return abs(analog_value - calibrated_idle_read) >= TOUCH_DETECTION_TRESHOLD ? 1 : 0;
 }
