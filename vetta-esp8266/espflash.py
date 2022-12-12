@@ -15,6 +15,9 @@ def _exec_args(args: tuple[str]) -> int:
 
 
 SPIFFS_IMAGE_FOLDER_PATH = os.path.join(os.getcwd(), "spiffs_image")
+if not os.path.exists(SPIFFS_IMAGE_FOLDER_PATH):
+    os.mkdir(SPIFFS_IMAGE_FOLDER_PATH)
+
 SPIFFS_AP_PASS_PATH = os.path.join(os.getcwd(), "spiffs_image", "ap.txt")
 
 CREDS_OUTPUT_FOLDER_PATH = os.path.join(os.getcwd(), "output_creds")
