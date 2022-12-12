@@ -11,6 +11,7 @@
 #include "touch.h"
 #include "button.h"
 #include "wifi_manager.h"
+#include "spiffs_storage.h"
 #include "espconfig_overwrite.h"
 
 static const UBaseType_t LED_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
@@ -72,11 +73,13 @@ static void capacitive_sensor_task(void *params)
             total += samples[ix++];
 
             // Logs capacitive sensor readings
+
             /*
             if(idle_read != 0){
                 printf("\nt:%u , idle: %u\n", total / READING_SAMPLES_POOL_SIZE, idle_read );
             }
             */
+
 
             if(ix == READING_SAMPLES_POOL_SIZE){
                 if(idle_read == 0){
