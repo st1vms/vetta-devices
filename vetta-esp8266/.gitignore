@@ -11,6 +11,6 @@ sdkconfig.*
 
 
 # Vetta related
-output_creds
+output
 
 spiffs_image

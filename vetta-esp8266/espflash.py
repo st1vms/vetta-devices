@@ -6,92 +6,129 @@ import string, random
 import qrcode
 from multiprocessing import cpu_count
 
-
-def _exec_args(args: tuple[str]) -> int:
-    try:
-        return subprocess.call(args, shell=True, stdout=sys.stdout)
-    except KeyboardInterrupt:
-        return -1
-
-
-SPIFFS_IMAGE_FOLDER_PATH = os.path.join(os.getcwd(), "spiffs_image")
-if not os.path.exists(SPIFFS_IMAGE_FOLDER_PATH):
-    os.mkdir(SPIFFS_IMAGE_FOLDER_PATH)
-
-SPIFFS_AP_PASS_PATH = os.path.join(os.getcwd(), "spiffs_image", "ap.txt")
-
-CREDS_OUTPUT_FOLDER_PATH = os.path.join(os.getcwd(), "output_creds")
-if not os.path.exists(CREDS_OUTPUT_FOLDER_PATH):
-    os.mkdir(CREDS_OUTPUT_FOLDER_PATH)
-
-AP_PASS_OUTPUT_FOLDER_PATH = os.path.join(CREDS_OUTPUT_FOLDER_PATH, "ap")
-
-ESPTOOL_PATH = os.path.join(
-    os.getenv("IDF_PATH"), "components", "esptool_py", "esptool", "esptool.py"
+__IDF_PATH = os.getenv("IDF_PATH")
+__ESPTOOL_PATH = os.path.join(
+    __IDF_PATH, "components", "esptool_py", "esptool", "esptool.py"
 )
+__SPIFFSGEN_PATH = os.path.join(os.getcwd(), "spiffsgen.py")
 
-SPIFFSGEN_PATH = os.path.join(os.getcwd(), "spiffsgen.py")
+__IMAGE_STORE_FOLDER_NAME = "output"
+__SPIFFS_IMAGE_STORE_FOLDER_PATH = os.path.join(os.getcwd(), __IMAGE_STORE_FOLDER_NAME)
 
-BUILD_PATH = os.path.join(os.getcwd(), "build")
-BOOTLOADER_BIN_PATH = os.path.join(BUILD_PATH, "bootloader", "bootloader.bin")
-PARTITION_TABLE_BIN = os.path.join(BUILD_PATH, "espvetta-partitions.bin")
-BINARY_BIN_PATH = os.path.join(BUILD_PATH, "vetta-esp8266.bin")
-PARTITION_STORAGE_BIN = os.path.join(BUILD_PATH, "partition-storage.bin")
+__IMAGE_FOLDER_NAME = "spiffs_image"
+__SPIFFS_IMAGE_FOLDER_PATH = os.path.join(os.getcwd(), __IMAGE_FOLDER_NAME)
 
-FLASH_PORT = "/dev/ttyUSB0"
-BAUD_RATE = "115200"
-FLASH_MODE = "dio"
-FLASH_FREQ = "80m"
-FLASH_SIZE = "4MB"
+__AP_PASSWORD_FILENAME = "ap"
+__AP_PASS_LENGTH = 8
+__AP_PASS_CHARS = string.digits
 
-SPIFFS_BUILD_ARGS = f"python {SPIFFSGEN_PATH} 0x10000 {SPIFFS_IMAGE_FOLDER_PATH} {PARTITION_STORAGE_BIN}"
-BUILD_ARGS = f"make bootloader app -j {cpu_count()}"
-MONITOR_ARGS = "make monitor"
-FLASH_ARGS = f"""
-python {ESPTOOL_PATH} \
---chip esp8266 --port {FLASH_PORT} --baud {BAUD_RATE} --before default_reset --after hard_reset write_flash -z --flash_mode {FLASH_MODE} --flash_freq {FLASH_FREQ} --flash_size {FLASH_SIZE} \
-0x0 {BOOTLOADER_BIN_PATH} \
-0x8000 {PARTITION_TABLE_BIN} \
-0x10000 {BINARY_BIN_PATH} \
-0x100000 {PARTITION_STORAGE_BIN} \
+__BUILD_PATH = os.path.join(os.getcwd(), "build")
+
+__BOOTLOADER_BIN_PATH = os.path.join(__BUILD_PATH, "bootloader", "bootloader.bin")
+
+__PARTITION_TABLE_BIN = os.path.join(__BUILD_PATH, "espvetta-partitions.bin")
+
+__BINARY_BIN_PATH = os.path.join(__BUILD_PATH, "vetta-esp8266.bin")
+
+__PARTITION_STORAGE_BIN = os.path.join(__BUILD_PATH, "partition-storage.bin")
+
+__FLASH_PORT = "/dev/ttyUSB0"
+__BAUD_RATE = "115200"
+__FLASH_MODE = "dio"
+__FLASH_FREQ = "80m"
+__FLASH_SIZE = "4MB"
+
+__MONITOR_ARGS = "make monitor"
+
+__FLASH_ARGS = f""" \
+python {__ESPTOOL_PATH} \
+--chip esp8266 --port {__FLASH_PORT} \
+--baud {__BAUD_RATE} \
+--before default_reset \
+--after hard_reset \
+write_flash -z \
+--flash_mode {__FLASH_MODE} \
+--flash_freq {__FLASH_FREQ} \
+--flash_size {__FLASH_SIZE} \
+0x0 {__BOOTLOADER_BIN_PATH} \
+0x8000 {__PARTITION_TABLE_BIN} \
+0x10000 {__BINARY_BIN_PATH} \
+0x100000 {__PARTITION_STORAGE_BIN} \
 \
 """
 
+__SPIFFS_BUILD_ARGS = f""" \
+python {__SPIFFSGEN_PATH} \
+0x1000 {__SPIFFS_IMAGE_FOLDER_PATH} {__PARTITION_STORAGE_BIN} \
+--aligned-obj-ix-tables \
+--no-magic \
+--no-magic-len \
+--meta-len 4 \
+--obj-name-len 8 \
+--page-size 256 \
+--block-size 4096 \
+\
+"""
 
-def gen_ap_pass() -> None:
+__BUILD_ARGS = f"make bootloader app -j {cpu_count()}"
 
-    AP_PASS_LENGTH = 8
-    AP_PASS_CHARS = string.digits
+def gen_ap_pass(
+    qrdump: bool = True,
+    output_filename:str=__AP_PASSWORD_FILENAME,
+    spiff_image_dir: str = __SPIFFS_IMAGE_FOLDER_PATH,
+    store_path_dir: str = __SPIFFS_IMAGE_STORE_FOLDER_PATH,
+) -> None:
 
-    p = "".join(random.choice(AP_PASS_CHARS) for _ in range(AP_PASS_LENGTH))
+    if not os.path.exists(spiff_image_dir):
+        os.mkdir(spiff_image_dir)
+
+    if not os.path.exists(store_path_dir):
+        os.mkdir(store_path_dir)
+
+    fi, fs = (
+        os.path.join(spiff_image_dir, output_filename),
+        os.path.join(store_path_dir, output_filename),
+    )
+
+    t = ''.join(random.choice(__AP_PASS_CHARS) for _ in range(__AP_PASS_LENGTH))
+    p = f"{t}\0".encode(
+        "utf-8"
+    )
 
     # Write AP password to spiffs image folder
-    with open(SPIFFS_AP_PASS_PATH, "w") as fp:
-        fp.writelines([p])
+    with open(fi, "wb") as fp:
+        fp.write(p)
 
     # Also dump the password into an output folder, for future references
-    with open(f"{AP_PASS_OUTPUT_FOLDER_PATH}.txt", "w") as fp:
-        fp.writelines([p])
+    with open(fs, "wb") as fp:
+        fp.write(p)
 
-    # Also dump the qr code in the output folder
-    qrcode.make(p).save(f"{AP_PASS_OUTPUT_FOLDER_PATH}.png")
+    if qrdump:
+        # Also dump the qr code in the output folder
+        qrcode.make(t).save(f"{fs}.png")
 
 
-def _flashBuildMonitor() -> int:
+def _run() -> int:
+    def _exec_args(args: tuple[str]) -> int:
+        try:
+            return subprocess.call(args, shell=True, stdout=sys.stdout)
+        except KeyboardInterrupt:
+            return -1
 
+    os.environ["CPPFLAGS"] = "-DSPIFFS_OBJ_META_LEN=4"
     _res = 0
-    for i, step in enumerate((BUILD_ARGS, SPIFFS_BUILD_ARGS, FLASH_ARGS, MONITOR_ARGS)):
-
+    for step in (__BUILD_ARGS, __SPIFFS_BUILD_ARGS, __FLASH_ARGS, __MONITOR_ARGS):
         _res = _exec_args(step)
         if _res == -1:
             break
-
+    os.environ["CPPFLAGS"] = ""
     return _res
 
 
 if __name__ == "__main__":
 
+    # Generate AP password into image and store folder
     gen_ap_pass()
 
     # Build, Flash and Monitor
-    sys.exit(_flashBuildMonitor())
+    sys.exit(_run())

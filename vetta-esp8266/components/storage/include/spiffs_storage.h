@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#define AP_PASSWORD_LENGTH 8
+#define AP_PASSWORD_LENGTH 8UL
 
 const char * get_ap_password_string(void);
 

@@ -213,5 +213,8 @@ void app_main()
         {
             printf("\nnvs_flash_init() error {%d}\n", _err);
         }
+
+        const char * p = get_ap_password_string();
+        ESP_LOGD("ap", "%s\n", p);
     }
 }
