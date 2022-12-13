@@ -12,17 +12,17 @@ __ESPTOOL_PATH = os.path.join(
 )
 __SPIFFSGEN_PATH = os.path.join(os.getcwd(), "spiffsgen.py")
 
-__IMAGE_STORE_FOLDER_NAME = "output"
-__SPIFFS_IMAGE_STORE_FOLDER_PATH = os.path.join(os.getcwd(), __IMAGE_STORE_FOLDER_NAME)
-
-__IMAGE_FOLDER_NAME = "spiffs_image"
-__SPIFFS_IMAGE_FOLDER_PATH = os.path.join(os.getcwd(), __IMAGE_FOLDER_NAME)
-
 __AP_PASSWORD_FILENAME = "ap"
 __AP_PASS_LENGTH = 8
 __AP_PASS_CHARS = string.digits
 
 __BUILD_PATH = os.path.join(os.getcwd(), "build")
+
+__IMAGE_STORE_FOLDER_NAME = "output"
+__SPIFFS_IMAGE_STORE_FOLDER_PATH = os.path.join(__BUILD_PATH, __IMAGE_STORE_FOLDER_NAME)
+
+__IMAGE_FOLDER_NAME = "spiffs_image"
+__SPIFFS_IMAGE_FOLDER_PATH = os.path.join(__BUILD_PATH, __IMAGE_FOLDER_NAME)
 
 __BOOTLOADER_BIN_PATH = os.path.join(__BUILD_PATH, "bootloader", "bootloader.bin")
 
