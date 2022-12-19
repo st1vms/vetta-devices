@@ -1,5 +1,8 @@
 #ifndef _VETTA_TOUCH_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/FreeRTOSConfig.h"
+#include "freertos/task.h"
 #include "esp_err.h"
 
 #ifdef __cplusplus
@@ -8,17 +11,11 @@ extern "C" {
 
 #define DEFAULT_SENSOR_READING_VALUE        (0)
 
-#define READING_SAMPLES_POOL_SIZE           (20)
+#define READING_SAMPLES_POOL_SIZE           (10)
 
 #define READING_DELAY_MILLIS                (10)
 
 #define TOUCH_DETECTION_TRESHOLD            (5)
-
-#ifndef CONFIG_FREERTOS_HZ
-#define CONFIG_FREERTOS_HZ  (100)   //menuconfig -> component config -> FreeRTOS -> Tick rate (hz)
-#endif //CONFIG_FREERTOS_HZ
-
-static inline void TIME_DELAY_MILLIS(long int x) {vTaskDelay(x / portTICK_PERIOD_MS);};
 
 /* Configures capacitive touch sensor module (non-thread safe)
 @return ESP_OK on success, esp_err_t value in case of errors

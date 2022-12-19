@@ -13,11 +13,13 @@ __ESPTOOL_PATH = os.path.join(
 __SPIFFSGEN_PATH = os.path.join(os.getcwd(), "spiffsgen.py")
 
 __AP_PASSWORD_FILENAME = "ap"
-__AP_PASS_LENGTH = 8
+__AP_PASS_LENGTH = 12
 __AP_PASS_CHARS = string.digits
 
 __BUILD_PATH = os.path.join(os.getcwd(), "build")
-
+if not os.path.exists(__BUILD_PATH):
+    os.mkdir(__BUILD_PATH)
+    
 __IMAGE_STORE_FOLDER_NAME = "output"
 __SPIFFS_IMAGE_STORE_FOLDER_PATH = os.path.join(__BUILD_PATH, __IMAGE_STORE_FOLDER_NAME)
 
@@ -79,6 +81,7 @@ def gen_ap_pass(
     store_path_dir: str = __SPIFFS_IMAGE_STORE_FOLDER_PATH,
 ) -> None:
 
+
     if not os.path.exists(spiff_image_dir):
         os.mkdir(spiff_image_dir)
 
@@ -126,6 +129,7 @@ def _run() -> int:
 
 
 if __name__ == "__main__":
+
 
     # Generate AP password into image and store folder
     gen_ap_pass()

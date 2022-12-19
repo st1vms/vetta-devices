@@ -9,18 +9,23 @@
 #include "esp_log.h"
 #include "led.h"
 #include "touch.h"
-#include "button.h"
+#include "esp_timer.h"
+#include "pu_button.h"
 #include "wifi_manager.h"
 #include "spiffs_storage.h"
 #include "espconfig_overwrite.h"
 
 static const UBaseType_t LED_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
 static const UBaseType_t CAPACITIVE_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
-static const UBaseType_t NETWORK_TASK_PRIORITY = 1;
+static const UBaseType_t BUTTON_TASK_PRIORITY = 1;
 
 static TaskHandle_t ledUpdaterTask = NULL;
 static TaskHandle_t capSensorTask = NULL;
-static TaskHandle_t networkTask = NULL;
+static TaskHandle_t buttonTask = NULL;
+
+static inline void TIME_DELAY_MILLIS(long int x) {vTaskDelay(x / portTICK_PERIOD_MS);};
+
+static led_animation_t current_led_animation;
 
 static void led_updater_task(void *params)
 {
@@ -38,10 +43,11 @@ static void led_updater_task(void *params)
                 // Led update from sensor
                 led_set_next();
             }
-            else if (ledNotificationValue & NETWORK_LED_NOTIFICATION_WAIT_VALUE)
+            else if (ledNotificationValue & LED_ANIMATION_START_NOTIFICATION_WAIT_VALUE)
             {
-                // Led update from network ( next_state )
-                led_set_next();
+                printf("\nStart Animation..\n");
+                play_led_animation(&current_led_animation);
+                printf("\nEnd Animation..\n");
             }
         }
     }
@@ -59,7 +65,7 @@ static void capacitive_sensor_task(void *params)
     static uint16_t total;
     total = 0;
 
-    static time_t time_offset;
+    static TickType_t time_offset;
     time_offset = 0;
 
     static unsigned char can_update_led;
@@ -73,14 +79,11 @@ static void capacitive_sensor_task(void *params)
             total += samples[ix++];
 
             // Logs capacitive sensor readings
-
             /*
             if(idle_read != 0){
                 printf("\nt:%u , idle: %u\n", total / READING_SAMPLES_POOL_SIZE, idle_read );
             }
             */
-
-
             if(ix == READING_SAMPLES_POOL_SIZE){
                 if(idle_read == 0){
                     idle_read = total / READING_SAMPLES_POOL_SIZE;
@@ -114,14 +117,16 @@ static void capacitive_sensor_task(void *params)
 static void button_isr_handler(void *args)
 {
     static BaseType_t xHigherPriorityTaskWoken;
+
     xHigherPriorityTaskWoken = pdFALSE;
 
-    // Send notification to the network task
-    xTaskNotifyFromISR(networkTask, (1UL << BUTTON_PRESSED_EVENT_NOTIFICATION_VALUE), eSetBits, &xHigherPriorityTaskWoken);
+    // Notify button task
+    xTaskNotifyFromISR(buttonTask, (1UL << BUTTON_INTR_EVENT_VALUE), eSetBits, &xHigherPriorityTaskWoken);
+
     portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
-static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+/* static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                        int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
@@ -138,25 +143,44 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     {
         ESP_LOGI("wifi", "\nIP_EVENT_STA_GOT_IP\n");
     }
+} */
+
+static void reset_callback(void){
+    if(!current_led_animation.is_playing){
+        printf("\nReset event start\n");
+        if(ESP_OK == SET_BLINK_OFF_HIGH_ANIMATION(&current_led_animation, 1)){
+            printf("\nBlink event sent!\n");
+            xTaskNotify(ledUpdaterTask, (1UL << LED_ANIMATION_START_NOTIFICATION_VALUE), eSetBits);
+        }
+    }else{
+        printf("\nReset event stop\n");
+        stop_led_animation(&current_led_animation);
+    }
 }
 
-static void network_task(void *params)
+static void button_task(void *params)
 {
-    static uint32_t networkNotificationValue;
+    static uint32_t buttonNotificationValue;
 
     for (;;)
     {
         if (xTaskNotifyWait(0x00,                      /* Don't clear any notification bits on entry. */
                             0xffffffffUL,              /* Reset the notification value to 0 on exit. */
-                            &networkNotificationValue, /* Notified value */
+                            &buttonNotificationValue,  /* Notified value */
                             portMAX_DELAY) == pdTRUE)
         {
-            if (networkNotificationValue & BUTTON_PRESSED_EVENT_NOTIFICATION_WAIT_VALUE)
+            if (buttonNotificationValue & BUTTON_INTR_EVENT_WAIT_VALUE)
             {
-                // Button has been pressed
-                printf("\nBUTTON PRESSED\n");
-                if(0){
-                    init_wifi(WIFI_MODE_STA, &wifi_event_handler);
+                switch (get_press_event())
+                {
+                    case PRESS_EVENT_RESET:
+                        reset_callback();
+                        break;
+                    case PRESS_EVENT_DISCOVERY:
+                        printf("\nDiscovery event\n");
+                        break;
+                    default:
+                        break;
                 }
             }
         }
@@ -178,7 +202,6 @@ void app_main()
     }
     else
     {
-
         // Create led updater task
         xTaskCreate(led_updater_task,
                     "led_task",
@@ -196,12 +219,12 @@ void app_main()
                     &capSensorTask);
 
         // Create button task
-        xTaskCreate(network_task,
+        xTaskCreate(button_task,
                     "button_task",
                     BUTTON_TASK_STACK_DEPTH,
                     NULL,
-                    NETWORK_TASK_PRIORITY,
-                    &networkTask);
+                    BUTTON_TASK_PRIORITY,
+                    &buttonTask);
 
         // Tasks created
         // Initialize button ISR, NVS and Wifi
@@ -214,7 +237,5 @@ void app_main()
             printf("\nnvs_flash_init() error {%d}\n", _err);
         }
 
-        const char * p = get_ap_password_string();
-        ESP_LOGD("ap", "%s\n", p);
     }
 }

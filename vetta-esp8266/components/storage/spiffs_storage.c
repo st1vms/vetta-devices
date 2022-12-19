@@ -1,19 +1,15 @@
-#include <stdio.h>
 #include <string.h>
-#include <sys/unistd.h>
-#include <sys/stat.h>
 #include "esp_err.h"
-#include "esp_log.h"
 #include "esp_spiffs.h"
-#include "mbedtls/md5.h"
 #include "spiffs_storage.h"
 
 static esp_vfs_spiffs_conf_t conf = {
     .base_path = "/spiffs",
     .partition_label = NULL,
     .max_files = 1,
-    .format_if_mount_failed = true
-};
+    .format_if_mount_failed = true};
+
+static size_t rlen = 0;
 
 static size_t totalSize = 0;
 static size_t usedSize = 0;
@@ -29,21 +25,58 @@ static esp_err_t init_spiffs(void)
     usedSize = 0;
 
     if (ESP_OK != (_err = esp_vfs_spiffs_register(&conf)) ||
-        ESP_OK != (_err = esp_spiffs_info(NULL, &totalSize, &usedSize)))
-    {
-        return _err;
-    }
-    return ESP_OK;
-}
-
-
-const char *get_ap_password_string(void)
-{
-
-    if (ESP_OK != init_spiffs() ||
+        ESP_OK != (_err = esp_spiffs_info(NULL, &totalSize, &usedSize)) ||
         totalSize <= AP_PASSWORD_LENGTH ||
         usedSize <= AP_PASSWORD_LENGTH)
     {
+        return _err;
+    }
+
+    return ESP_OK;
+}
+
+static const char *__get_chached_password_array(void)
+{
+
+    static unsigned char z;
+    // Check if pass array is missing NULL termination
+    if (0 != (z = pass[AP_PASSWORD_LENGTH]))
+    {
+        rlen = 0;
+        memset(pass, 0, AP_PASSWORD_LENGTH + 1);
+        return NULL;
+    }
+
+    // Check for zero filled array
+    for (unsigned char i = 0; i < AP_PASSWORD_LENGTH; i++)
+    {
+        z = (pass[i] != 0) ? 1 : 0;
+        if (z)
+        {
+            break;
+        }
+    }
+
+    if (!z)
+    {
+        rlen = 0;
+        memset(pass, 0, AP_PASSWORD_LENGTH + 1);
+        return NULL;
+    }
+
+    return (const char *)pass;
+}
+
+const char *get_ap_password_cstring(void)
+{
+    if (rlen == AP_PASSWORD_LENGTH)
+    {
+        return __get_chached_password_array();
+    }
+
+    if (ESP_OK != init_spiffs())
+    {
+        rlen = 0;
         esp_vfs_spiffs_unregister(NULL);
         return NULL;
     }
@@ -51,22 +84,20 @@ const char *get_ap_password_string(void)
     FILE *fp = fopen(ap_password_filename, "rb");
     if (!fp)
     {
+        rlen = 0;
         esp_vfs_spiffs_unregister(NULL);
         return NULL;
     }
 
-    memset(pass, 0x0, AP_PASSWORD_LENGTH + 1);
-
-    int i = fread(pass, sizeof(char), AP_PASSWORD_LENGTH, fp);
-    if (i != AP_PASSWORD_LENGTH)
+    memset(pass, 0, AP_PASSWORD_LENGTH + 1);
+    rlen = fread(pass, sizeof(char), AP_PASSWORD_LENGTH, fp);
+    if (rlen != AP_PASSWORD_LENGTH)
     {
-        fclose(fp);
-        memset(pass, 0x0, AP_PASSWORD_LENGTH);
-        esp_vfs_spiffs_unregister(NULL);
-        return NULL;
+        rlen = 0;
+        memset(pass, 0, AP_PASSWORD_LENGTH + 1);
     }
 
     fclose(fp);
     esp_vfs_spiffs_unregister(NULL);
-    return pass;
+    return (rlen != AP_PASSWORD_LENGTH) ? NULL : (const char *)pass;
 }

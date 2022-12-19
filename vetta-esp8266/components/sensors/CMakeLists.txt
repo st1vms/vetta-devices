@@ -1,4 +1,4 @@
-idf_component_register(SRCS "button.c" "led.c" "touch.c"
+idf_component_register(SRCS "pu_button.c" "led.c" "touch.c"
                        INCLUDE_DIRS "include"
                        PRIVATE_HEADER   "freertos/FreeRTOS.h"
                                         "freertos/FreeRTOSConfig.h"
