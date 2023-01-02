@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 esp_err_t init_wifi(wifi_mode_t wifi_mode, esp_event_handler_t wifi_event_handler);
+esp_err_t deinit_wifi(esp_event_handler_t handler_func);
 
 #ifdef __cplusplus
 }

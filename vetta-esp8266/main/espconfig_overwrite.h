@@ -4,6 +4,11 @@
 extern "C" {
 #endif
 
+// From sdkconfig.h
+#ifndef CONFIG_FREERTOS_HZ
+#define CONFIG_FREERTOS_HZ 100
+#endif
+
 // Task configurations
 #define LED_UPDATER_TASK_STACK_DEPTH        2048
 
@@ -12,6 +17,8 @@ extern "C" {
 #define BUTTON_TASK_STACK_DEPTH             2048
 
 #define CAPACITIVE_SENSOR_LED_UPDATE_DELAY  500
+
+#define NETWORK_TASK_STACK_DEPTH            4098
 
 // Task notifications
 #ifndef configTASK_NOTIFICATION_ARRAY_ENTRIES
@@ -28,6 +35,9 @@ extern "C" {
 
 #define BUTTON_INTR_EVENT_WAIT_VALUE (0x01)
 #define BUTTON_INTR_EVENT_VALUE (0UL)
+
+#define NETWORK_AP_START_WAIT_VALUE (0x01)
+#define NETWORK_AP_START_VALUE (0UL)
 
 #ifdef __cplusplus
 }

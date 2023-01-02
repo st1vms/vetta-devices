@@ -1,4 +1,4 @@
-#ifndef _PU_BUTTON_H
+#ifndef _PUSH_BUTTON_H
 
 #include "esp_err.h"
 #include "driver/gpio.h"
@@ -7,8 +7,6 @@
 extern "C" {
 #endif
 
-
-// Pull-up push button
 static const gpio_num_t BUTTON_GPIO_NUMBER = GPIO_NUM_4;
 
 #define BUTTON_TICK_PERIOD (10UL)
@@ -25,7 +23,7 @@ typedef enum{
     PRESS_EVENT_DISCOVERY,
 }PressEvent_t;
 
-// Initialize ISR for pull-up button ( intr_type LOW )
+// Initialize ISR for pull-down button ( intr_type LOW )
 esp_err_t init_button(gpio_isr_t isr_handler);
 
 PressEvent_t get_press_event(void);
@@ -34,5 +32,5 @@ PressEvent_t get_press_event(void);
 }
 #endif
 
-#define _PU_BUTTON_H
-#endif //_PU_BUTTON_H
+#define _PUSH_BUTTON_H
+#endif //_PUSH_BUTTON_H
