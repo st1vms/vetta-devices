@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOSConfig.h"
 #include "freertos/task.h"
 #include "esp_system.h"
+#include "esp_log.h"
 #include "push_button.h"
 
 static const gpio_config_t io_conf = {
@@ -42,9 +43,8 @@ PressEvent_t get_press_event(void){
         if(start && end - start >= DISCOVERY_REASON_PRESS_DELAY_MILLIS){
             if(end - start >= RESET_REASON_PRESS_DELAY_MILLIS){
                 return PRESS_EVENT_RESET;
-            }else{
-                return PRESS_EVENT_DISCOVERY;
             }
+            return PRESS_EVENT_DISCOVERY;
         }
     }
     return PRESS_EVENT_ERROR;

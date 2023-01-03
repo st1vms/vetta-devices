@@ -28,7 +28,7 @@ __SPIFFS_IMAGE_FOLDER_PATH = os.path.join(__BUILD_PATH, __IMAGE_FOLDER_NAME)
 
 __BOOTLOADER_BIN_PATH = os.path.join(__BUILD_PATH, "bootloader", "bootloader.bin")
 
-__PARTITION_TABLE_BIN = os.path.join(__BUILD_PATH, "espvetta-partitions.bin")
+__PARTITION_TABLE_BIN = os.path.join(__BUILD_PATH, "partition-table.bin")
 
 __BINARY_BIN_PATH = os.path.join(__BUILD_PATH, "vetta-esp8266.bin")
 
@@ -68,13 +68,13 @@ python {__SPIFFSGEN_PATH} \
 
 __BUILD_ARGS = f"make bootloader app -j {cpu_count()}"
 
+
 def gen_ap_pass(
     qrdump: bool = True,
-    output_filename:str=__AP_PASSWORD_FILENAME,
+    output_filename: str = __AP_PASSWORD_FILENAME,
     spiff_image_dir: str = __SPIFFS_IMAGE_FOLDER_PATH,
     store_path_dir: str = __SPIFFS_IMAGE_STORE_FOLDER_PATH,
 ) -> None:
-
 
     if not os.path.exists(spiff_image_dir):
         os.mkdir(spiff_image_dir)
@@ -87,7 +87,7 @@ def gen_ap_pass(
         os.path.join(store_path_dir, output_filename),
     )
 
-    t = ''.join(random.choice(__AP_PASS_CHARS) for _ in range(__AP_PASS_LENGTH))
+    t = "".join(random.choice(__AP_PASS_CHARS) for _ in range(__AP_PASS_LENGTH))
 
     # Write AP password to spiffs image folder
     with open(f"{fi}.txt", "w") as fp:
@@ -109,7 +109,9 @@ def _run() -> int:
         except KeyboardInterrupt:
             return -1
 
-    os.environ["CPPFLAGS"] = "-DSPIFFS_OBJ_META_LEN=4 -DSPIFFS_ALIGNED_OBJECT_INDEX_TABLES=4"
+    os.environ[
+        "CPPFLAGS"
+    ] = "-DSPIFFS_OBJ_META_LEN=4 -DSPIFFS_ALIGNED_OBJECT_INDEX_TABLES=4"
     _res = 0
     for step in (__BUILD_ARGS, __SPIFFS_BUILD_ARGS, __FLASH_ARGS, __MONITOR_ARGS):
         _res = _exec_args(step)
@@ -120,7 +122,6 @@ def _run() -> int:
 
 
 if __name__ == "__main__":
-
 
     # Generate AP password into image and store folder
     gen_ap_pass()

@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-static const gpio_num_t BUTTON_GPIO_NUMBER = GPIO_NUM_4;
+static const gpio_num_t BUTTON_GPIO_NUMBER = GPIO_NUM_13;
 
 #define BUTTON_TICK_PERIOD (10UL)
 
@@ -15,7 +15,7 @@ static const gpio_num_t BUTTON_GPIO_NUMBER = GPIO_NUM_4;
 
 #define RESET_REASON_PRESS_DELAY_MILLIS (5000UL)
 
-#define DISCOVERY_REASON_PRESS_DELAY_MILLIS (50UL)
+#define DISCOVERY_REASON_PRESS_DELAY_MILLIS (1000UL)
 
 typedef enum{
     PRESS_EVENT_ERROR,

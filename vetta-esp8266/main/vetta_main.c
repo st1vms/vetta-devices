@@ -18,17 +18,20 @@
 
 static const UBaseType_t LED_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
 static const UBaseType_t CAPACITIVE_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
-static const UBaseType_t BUTTON_TASK_PRIORITY = 1;
-static const UBaseType_t NETWORK_TASK_PRIORITY = 2;
+static const UBaseType_t BUTTON_TASK_PRIORITY = tskIDLE_PRIORITY;
+static const UBaseType_t NETWORK_TASK_PRIORITY = 1;
 
 static TaskHandle_t ledUpdaterTask = NULL;
 static TaskHandle_t capSensorTask = NULL;
 static TaskHandle_t buttonTask = NULL;
 static TaskHandle_t networkTask = NULL;
 
-static inline void TIME_DELAY_MILLIS(long int x) {vTaskDelay(x / portTICK_PERIOD_MS);};
+static SemaphoreHandle_t networkSem = NULL;
+static SemaphoreHandle_t networkStopSem = NULL;
 
-static led_animation_t current_led_animation;
+static unsigned char network_task_working;
+
+static inline void TIME_DELAY_MILLIS(long int x) { vTaskDelay(x / portTICK_PERIOD_MS); };
 
 static void led_updater_task(void *params)
 {
@@ -46,11 +49,15 @@ static void led_updater_task(void *params)
                 // Led update from sensor
                 led_set_next();
             }
-            else if (ledNotificationValue & LED_ANIMATION_START_NOTIFICATION_WAIT_VALUE)
+            else if (ledNotificationValue & LED_BLINK_ANIMATION_START_NOTIFICATION_WAIT_VALUE)
             {
-                printf("\nStart Animation..\n");
-                play_led_animation(&current_led_animation);
-                printf("\nEnd Animation..\n");
+                if (ESP_OK == SET_BLINK_OFF_HIGH_ANIMATION(1))
+                {
+
+                    printf("\nStart Animation..\n");
+                    play_led_animation();
+                    printf("\nEnd Animation..\n");
+                }
             }
         }
     }
@@ -87,8 +94,10 @@ static void capacitive_sensor_task(void *params)
                 printf("\nt:%u , idle: %u\n", total / READING_SAMPLES_POOL_SIZE, idle_read );
             }
             */
-            if(ix == READING_SAMPLES_POOL_SIZE){
-                if(idle_read == 0){
+            if (ix == READING_SAMPLES_POOL_SIZE)
+            {
+                if (idle_read == 0)
+                {
                     idle_read = total / READING_SAMPLES_POOL_SIZE;
                 }
                 ix = 0;
@@ -129,23 +138,6 @@ static void button_isr_handler(void *args)
     portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
-static unsigned char network_task_done = 0;
-static unsigned char network_stop_flag = 0;
-static void stopNetworkTaskWaiting(void){
-
-    static unsigned long int timeout_millis;
-    timeout_millis = 0;
-
-    network_stop_flag = 1;
-    while(!network_task_done || timeout_millis >= 10000) // 10 seconds timeout
-    {
-        TIME_DELAY_MILLIS(10);
-        timeout_millis += xTaskGetTickCount() * portTICK_PERIOD_MS;
-    }
-    network_stop_flag = 0;
-}
-
-
 /* static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                        int32_t event_id, void *event_data)
 {
@@ -165,71 +157,100 @@ static void stopNetworkTaskWaiting(void){
     }
 } */
 
-static void reset_callback(void){
+static void waitNetworkStop(void)
+{
+    if(!networkSem || !networkStopSem || !network_task_working){return;}
 
-    if(!current_led_animation.is_playing){
-        if(ESP_OK == SET_BLINK_OFF_HIGH_ANIMATION(&current_led_animation, 1)){
-            xTaskNotify(ledUpdaterTask, (1UL << LED_ANIMATION_START_NOTIFICATION_VALUE), eSetBits);
-        }
+    if(pdTRUE == xSemaphoreGive(networkStopSem) &&
+        pdTRUE == xSemaphoreTake(networkSem, portMAX_DELAY))
+    {
+        xSemaphoreTake(networkStopSem, (TickType_t) 10);
     }
 }
 
 static void button_task(void *params)
 {
+
     static uint32_t buttonNotificationValue;
 
     for (;;)
     {
-        if (xTaskNotifyWait(0x00,                      /* Don't clear any notification bits on entry. */
-                            0xffffffffUL,              /* Reset the notification value to 0 on exit. */
-                            &buttonNotificationValue,  /* Notified value */
+        if (xTaskNotifyWait(0x00,                     /* Don't clear any notification bits on entry. */
+                            0xffffffffUL,             /* Reset the notification value to 0 on exit. */
+                            &buttonNotificationValue, /* Notified value */
                             portMAX_DELAY) == pdTRUE)
         {
             if (buttonNotificationValue & BUTTON_INTR_EVENT_WAIT_VALUE)
             {
                 switch (get_press_event())
                 {
-                    case PRESS_EVENT_RESET:
-                        reset_callback();
-                        break;
-                    case PRESS_EVENT_DISCOVERY:
-                        printf("\nDiscovery event\n");
-                        break;
-                    default:
-                        break;
+                case PRESS_EVENT_RESET:
+
+                    // Send blink animation event
+                    xTaskNotify(ledUpdaterTask, (1UL << LED_BLINK_ANIMATION_START_NOTIFICATION_VALUE), eSetBits);
+
+                    waitNetworkStop();
+
+                    // Reset persistent storage
+                    spiffs_data_reset();
+
+                    xTaskNotify(networkTask, (1UL << NETWORK_AP_START_VALUE), eSetBits);
+
+                    stop_led_animation();
+                    break;
+                case PRESS_EVENT_DISCOVERY:
+
+                    waitNetworkStop();
+
+                    break;
+                default:
+                    break;
                 }
             }
         }
     }
 }
 
-static void network_task(void *params){
+static void network_task(void *params)
+{
 
     static uint32_t networkNotificationValue;
 
-    for(;;){
+    unsigned long int tick = 0;
+
+    for (;;)
+    {
         if (xTaskNotifyWait(0x00,                      /* Don't clear any notification bits on entry. */
                             0xffffffffUL,              /* Reset the notification value to 0 on exit. */
-                            &networkNotificationValue,  /* Notified value */
+                            &networkNotificationValue, /* Notified value */
                             portMAX_DELAY) == pdTRUE)
         {
             if (networkNotificationValue & NETWORK_AP_START_WAIT_VALUE)
             {
+                tick = 0;
+
                 // Received AP start notification
-                network_task_done = 0;
+                printf("\nNetwork task start...\n");
 
+                network_task_working = 1;
                 // Critical section start
-                while(!network_stop_flag){
-                    TIME_DELAY_MILLIS(10);
+                while(pdTRUE != xSemaphoreTake(networkStopSem, (TickType_t) 10))
+                {
+                    printf("\n1 second delay... %lu\n", tick);
+                    TIME_DELAY_MILLIS(1000);
+                    tick += 1;
                 }
+                network_task_working = 0;
                 // Critical section end
+                if(networkSem){
+                    xSemaphoreGive(networkSem);
+                }
 
-                network_task_done = 1;
+                printf("\nNetwork task end...\n");
             }
         }
     }
 }
-
 
 void app_main()
 {
@@ -246,6 +267,19 @@ void app_main()
     }
     else
     {
+
+        network_task_working = 0;
+
+        if(!networkSem){
+            networkSem = xSemaphoreCreateBinary();
+            xSemaphoreTake(networkSem, (TickType_t) 10);
+        }
+
+        if(!networkStopSem){
+            networkStopSem = xSemaphoreCreateBinary();
+            xSemaphoreTake(networkStopSem, (TickType_t) 10);
+        }
+
         // Create led updater task
         xTaskCreate(led_updater_task,
                     "led_task",
@@ -288,12 +322,5 @@ void app_main()
         {
             printf("\nnvs_flash_init() error {%d}\n", _err);
         }
-
-        const spiffs_string_t * u = get_lamp_ap_password_string();
-        if(u != NULL)
-        {
-            printf("\n %s - %u\n", u->string_array, u->string_len);
-        }
-
     }
 }

@@ -13,7 +13,7 @@ extern "C"
 #define LED_GPIO_PIN_OUTPUT_VALUE (15) // Output pin D8
 #define PWM_PHASE_VALUE (90.0)
 
-    typedef enum
+    typedef enum led_step_duty_t
     {
         LED_OFF_DUTY_CYCLE = 0,
         LED_LOW_DUTY_CYCLE = 300,    // (0x99a)     // ~30% PWM_PERIOD
@@ -38,10 +38,11 @@ extern "C"
         led_animation_step_t *steps_buf;
     } led_animation_t;
 
-    esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(led_animation_t *animation, unsigned char do_loop);
+    esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(unsigned char do_loop);
 
-    esp_err_t play_led_animation(led_animation_t *animation);
-    void stop_led_animation(led_animation_t *animation);
+    esp_err_t play_led_animation(void);
+
+    void stop_led_animation(void);
 
     /* Configures led and pwm modules (non-thread safe)
     @return ESP_OK on success, esp_err_t value in case of errors
@@ -49,32 +50,32 @@ extern "C"
     esp_err_t init_led_module(void);
 
     /* Switch the led to off state, calls pwm_stop() and pwm_deinit() right after. (non-thread safe)
-    @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+    @return ESP_OK on success, esp_err_t value in case of errors
     */
     esp_err_t led_shutdown(void);
 
     /* Switch the led to off state, pwm_stop() and pwm_deinit() are not called  (non-thread safe)
-    @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+    @return ESP_OK on success, esp_err_t value in case of errors
     */
     esp_err_t led_off(void);
 
     /* Switch the led to low state (non-thread safe)
-    @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+    @return ESP_OK on success, esp_err_t value in case of errors
     */
     esp_err_t led_low(void);
 
     /* Switch the led to medium state (non-thread safe)
-    @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+    @return ESP_OK on success, esp_err_t value in case of errors
     */
     esp_err_t led_medium(void);
 
     /* Switch the led to high state (non-thread safe)
-    @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+    @return ESP_OK on success, esp_err_t value in case of errors
     */
     esp_err_t led_high(void);
 
     /*  Switch the led next state (non-thread safe)
-    @return @return ESP_OK on success, ESP_ERR_INVALID_ARG in case of errors
+    @return @return ESP_OK on success, esp_err_t value in case of errors
     */
     esp_err_t led_set_next(void);
 
