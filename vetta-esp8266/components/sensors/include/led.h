@@ -31,18 +31,18 @@ extern "C"
     // Ring buffer
     typedef struct led_animation_t
     {
-        unsigned char canceled;
         unsigned char is_playing;
+        unsigned char canceled;
         unsigned int step_size;
-        unsigned char do_loop;
+        signed char reps;
         led_animation_step_t *steps_buf;
     } led_animation_t;
 
-    esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(unsigned char do_loop);
+    esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(signed char reps);
 
-    esp_err_t play_led_animation(void);
+    esp_err_t play_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t ledAnimationSem);
 
-    void stop_led_animation(void);
+    void stop_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t ledAnimationSem);
 
     /* Configures led and pwm modules (non-thread safe)
     @return ESP_OK on success, esp_err_t value in case of errors

@@ -1,8 +1,5 @@
 #ifndef _VETTA_TOUCH_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/FreeRTOSConfig.h"
-#include "freertos/task.h"
 #include "esp_err.h"
 
 #ifdef __cplusplus

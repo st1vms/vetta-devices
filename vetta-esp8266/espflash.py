@@ -61,8 +61,10 @@ write_flash -z \
 
 __SPIFFS_BUILD_ARGS = f""" \
 python {__SPIFFSGEN_PATH} \
-0x8000 {__SPIFFS_IMAGE_FOLDER_PATH} {__PARTITION_STORAGE_BIN} \
+0x1000 {__SPIFFS_IMAGE_FOLDER_PATH} {__PARTITION_STORAGE_BIN} \
 --aligned-obj-ix-tables \
+--no-magic \
+--no-magic-len \
 \
 """
 

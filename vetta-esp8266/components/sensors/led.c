@@ -1,6 +1,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/FreeRTOSConfig.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "esp_system.h"
+#include "esp_event.h"
 #include "esp8266/gpio_register.h"
 #include "esp8266/pin_mux_register.h"
 #include "driver/pwm.h"
@@ -85,7 +88,7 @@ esp_err_t led_set_next(void)
     return ESP_FAIL;
 }
 
-static esp_err_t set_led_animation(size_t step_count, led_animation_step_t *steps, unsigned char do_loop)
+static esp_err_t set_led_animation(size_t step_count, led_animation_step_t *steps, signed char reps)
 {
     if (NULL == steps || !step_count)
     {
@@ -94,67 +97,70 @@ static esp_err_t set_led_animation(size_t step_count, led_animation_step_t *step
 
     current_led_animation.canceled = 0;
     current_led_animation.is_playing = 0;
-    current_led_animation.do_loop = do_loop;
+    current_led_animation.reps = reps;
     current_led_animation.step_size = step_count;
     current_led_animation.steps_buf = steps;
 
     return ESP_OK;
 }
 
-esp_err_t play_led_animation(void)
+esp_err_t play_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t ledAnimationSem)
 {
     if (NULL == current_led_animation.steps_buf ||
         current_led_animation.step_size == 0 ||
-        current_led_animation.canceled ||
         current_led_animation.is_playing)
     {
         return ESP_ERR_INVALID_ARG;
     }
 
     current_led_animation.is_playing = 1;
-    do
+    unsigned int i = 0;
+
+    while (i <= current_led_animation.step_size)
     {
-        for (unsigned int i = 0; i < current_led_animation.step_size; i++)
-        {
-            vTaskDelay(current_led_animation.steps_buf[i].start_delay / portTICK_PERIOD_MS);
-
-            if (current_led_animation.canceled)
-            {
-                break;
-            }
-
-            set_duty(current_led_animation.steps_buf[i].duty_cycle);
-
-            vTaskDelay(current_led_animation.steps_buf[i].end_delay / portTICK_PERIOD_MS);
+        if(pdTRUE == xSemaphoreTake(ledStopSem, current_led_animation.steps_buf[i].start_delay / portTICK_PERIOD_MS)){
+            break;
+        }
+        set_duty(current_led_animation.steps_buf[i].duty_cycle);
+        if(pdTRUE == xSemaphoreTake(ledStopSem, current_led_animation.steps_buf[i].end_delay / portTICK_PERIOD_MS)){
+            break;
         }
 
-    } while (!current_led_animation.canceled && current_led_animation.do_loop);
+        if(++i == current_led_animation.step_size && (current_led_animation.reps == -1 ||
+            (current_led_animation.reps)-- > 0))
+        {
+            i = 0;
+        }
+    }
 
-    led_off();
+    set_duty(LED_OFF_DUTY_CYCLE);
 
     current_led_animation.is_playing = 0;
+    xSemaphoreGive(ledAnimationSem);
+
     return ESP_OK;
 }
 
-void stop_led_animation(void)
+void stop_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t ledAnimationSem)
 {
-    if (current_led_animation.is_playing)
+    if (pdTRUE == xSemaphoreGive(ledStopSem) &&
+        pdTRUE == xSemaphoreTake(ledAnimationSem, portMAX_DELAY))
     {
-        current_led_animation.canceled = 1;
+        xSemaphoreTake(ledStopSem, (TickType_t)10);
     }
 }
 
-static led_animation_step_t _OFF_HIGH_BLINK_STEPS[] = {
-    (led_animation_step_t){
-        .duty_cycle = LED_HIGH_DUTY_CYCLE,
-        .start_delay = 0,
-        .end_delay = 250},
-    (led_animation_step_t){
-        .duty_cycle = LED_OFF_DUTY_CYCLE,
-        .start_delay = 0,
-        .end_delay = 250}};
-
-esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(unsigned char do_loop)
+esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(signed char reps)
 {
-    return set_led_animation(2, _OFF_HIGH_BLINK_STEPS, do_loop);
+    static led_animation_step_t _OFF_HIGH_BLINK_STEPS[] = {
+        (led_animation_step_t){
+            .duty_cycle = LED_HIGH_DUTY_CYCLE,
+            .start_delay = 0,
+            .end_delay = 150},
+        (led_animation_step_t){
+            .duty_cycle = LED_OFF_DUTY_CYCLE,
+            .start_delay = 0,
+            .end_delay = 150}
+    };
+    return set_led_animation(2, _OFF_HIGH_BLINK_STEPS, reps);
 }

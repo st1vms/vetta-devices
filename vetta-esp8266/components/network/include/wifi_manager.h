@@ -1,15 +1,14 @@
 #ifndef __WIFI_MANAGER_H
 
 #include "esp_err.h"
-#include "esp_wifi.h"
-#include "esp_event_base.h"
-#include "nvs_flash.h"
+#include "esp_event.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-// Wifi configurations
+// esp-wifi configurations
 #ifndef CONFIG_ESP8266_WIFI_RX_BUFFER_NUM
 #define CONFIG_ESP8266_WIFI_RX_BUFFER_NUM 15
 #endif
@@ -26,8 +25,20 @@ extern "C" {
 #define CONFIG_ESP8266_WIFI_TX_PKT_NUM 5
 #endif
 
-esp_err_t init_wifi(wifi_mode_t wifi_mode, esp_event_handler_t wifi_event_handler);
-esp_err_t deinit_wifi(esp_event_handler_t handler_func);
+// AP/Station configuration
+
+#define WIFI_STA_CONNECTED_BIT  BIT0
+#define WIFI_AP_STA_CONNECTED_BIT BIT1
+
+
+#define LAMP_AP_SSID "VettaV1"
+
+#define LAMP_AP_SSID_STRLEN (7UL)
+
+    esp_err_t init_wifi_ap(EventGroupHandle_t network_event_group, const uint8_t *ap_pwd_str, size_t ap_pwd_size);
+    esp_err_t init_wifi_sta(EventGroupHandle_t network_event_group, const uint8_t *sta_ssid_str, size_t sta_ssid_size, const uint8_t *sta_pwd_str, size_t sta_pwd_size);
+
+    esp_err_t deinit_wifi(void);
 
 #ifdef __cplusplus
 }

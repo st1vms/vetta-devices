@@ -1,6 +1,5 @@
-#include <stdio.h>
-
 #include <string.h>
+#include <sys/unistd.h>
 #include "esp_err.h"
 #include "esp_spiffs.h"
 #include "storage.h"
@@ -76,7 +75,7 @@ static esp_err_t read_spiffs_string(spiffs_string_t *out_string)
 
     memset(out_string->string_array, 0, out_string->string_len + 1);
 
-    if (out_string->string_len != fread(out_string->string_array, sizeof(char), out_string->string_len, fp))
+    if (out_string->string_len != fread(out_string->string_array, sizeof(uint8_t), out_string->string_len, fp))
     {
         memset(out_string->string_array, 0, out_string->string_len + 1);
         fclose(fp);
@@ -88,7 +87,7 @@ static esp_err_t read_spiffs_string(spiffs_string_t *out_string)
     return ESP_OK;
 }
 
-static esp_err_t write_spiffs_string(const char *filename, const char *str, size_t str_len)
+static esp_err_t write_spiffs_string(const char *filename, const uint8_t *str, size_t str_len)
 {
 
     if (NULL == filename ||
@@ -105,7 +104,7 @@ static esp_err_t write_spiffs_string(const char *filename, const char *str, size
         return ESP_FAIL;
     }
 
-    if (str_len != fwrite(str, sizeof(char), str_len, fp))
+    if (str_len != fwrite(str, sizeof(uint8_t), str_len, fp))
     {
         fclose(fp);
         unlink(filename);
@@ -163,7 +162,7 @@ const spiffs_string_t *get_user_ap_ssid_string(void)
     return NULL;
 }
 
-esp_err_t save_user_ap_password(const char *ap_pwd, size_t pwd_length)
+esp_err_t save_user_ap_password(const uint8_t *ap_pwd, size_t pwd_length)
 {
     static esp_err_t _err;
 
@@ -181,7 +180,7 @@ esp_err_t save_user_ap_password(const char *ap_pwd, size_t pwd_length)
     return _err;
 }
 
-esp_err_t save_user_ap_ssid(const char *ap_ssid, size_t ssid_length)
+esp_err_t save_user_ap_ssid(const uint8_t *ap_ssid, size_t ssid_length)
 {
     static esp_err_t _err;
 
@@ -189,7 +188,6 @@ esp_err_t save_user_ap_ssid(const char *ap_ssid, size_t ssid_length)
     {
         if (ESP_OK == (_err = write_spiffs_string(user_ap_ssid_string.filename, ap_ssid, ssid_length)))
         {
-
             user_ap_ssid_string.string_len = ssid_length;
             user_ap_ssid_string.is_cached = 0;
             esp_vfs_spiffs_unregister(NULL);

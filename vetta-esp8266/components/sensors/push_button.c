@@ -5,6 +5,12 @@
 #include "esp_log.h"
 #include "push_button.h"
 
+// From sdkconfig.h
+#ifndef CONFIG_FREERTOS_HZ
+#define CONFIG_FREERTOS_HZ 100
+#endif
+static unsigned char is_pressed = 0;
+
 static const gpio_config_t io_conf = {
     .mode = GPIO_MODE_INPUT,
     .pull_up_en = GPIO_PULLUP_DISABLE,
@@ -28,22 +34,25 @@ esp_err_t init_button(gpio_isr_t isr_handler){
 }
 
 static inline TickType_t getTickMillis(){
-    return xTaskGetTickCount() * BUTTON_TICK_PERIOD;
+    return xTaskGetTickCount() * portTICK_PERIOD_MS;
 }
 
 static TickType_t start = 0, end = 0;
 PressEvent_t get_press_event(void){
 
     // Pull-down -> 1 pressed | 0 released
-    if(gpio_get_level(BUTTON_GPIO_NUMBER)){
+    if(gpio_get_level(BUTTON_GPIO_NUMBER) && !is_pressed){
         start = getTickMillis();
         end = start;
-    }else{
+        is_pressed = !is_pressed;
+    }else if(is_pressed){
         end = getTickMillis();
         if(start && end - start >= DISCOVERY_REASON_PRESS_DELAY_MILLIS){
             if(end - start >= RESET_REASON_PRESS_DELAY_MILLIS){
+                is_pressed = !is_pressed;
                 return PRESS_EVENT_RESET;
             }
+            is_pressed = !is_pressed;
             return PRESS_EVENT_DISCOVERY;
         }
     }

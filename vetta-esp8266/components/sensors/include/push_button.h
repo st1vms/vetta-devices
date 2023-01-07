@@ -9,8 +9,6 @@ extern "C" {
 
 static const gpio_num_t BUTTON_GPIO_NUMBER = GPIO_NUM_13;
 
-#define BUTTON_TICK_PERIOD (10UL)
-
 #define BUTTON_PIN (1ULL<<BUTTON_GPIO_NUMBER)
 
 #define RESET_REASON_PRESS_DELAY_MILLIS (5000UL)
