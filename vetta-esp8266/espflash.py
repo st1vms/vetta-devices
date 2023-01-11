@@ -2,37 +2,22 @@
 
 import subprocess
 import os, sys
-import string, random
-import qrcode
 from multiprocessing import cpu_count
 
 __IDF_PATH = os.getenv("IDF_PATH")
 __ESPTOOL_PATH = os.path.join(
     __IDF_PATH, "components", "esptool_py", "esptool", "esptool.py"
 )
-__SPIFFSGEN_PATH = os.path.join(os.getcwd(), "spiffsgen.py")
-
-__AP_PASSWORD_FILENAME = "ap"
-__AP_PASS_LENGTH = 12
-__AP_PASS_CHARS = string.digits
 
 __BUILD_PATH = os.path.join(os.getcwd(), "build")
 if not os.path.exists(__BUILD_PATH):
     os.mkdir(__BUILD_PATH)
-
-__IMAGE_STORE_FOLDER_NAME = "output"
-__SPIFFS_IMAGE_STORE_FOLDER_PATH = os.path.join(__BUILD_PATH, __IMAGE_STORE_FOLDER_NAME)
-
-__IMAGE_FOLDER_NAME = "spiffs_image"
-__SPIFFS_IMAGE_FOLDER_PATH = os.path.join(__BUILD_PATH, __IMAGE_FOLDER_NAME)
 
 __BOOTLOADER_BIN_PATH = os.path.join(__BUILD_PATH, "bootloader", "bootloader.bin")
 
 __PARTITION_TABLE_BIN = os.path.join(__BUILD_PATH, "partition-table.bin")
 
 __BINARY_BIN_PATH = os.path.join(__BUILD_PATH, "vetta-esp8266.bin")
-
-__PARTITION_STORAGE_BIN = os.path.join(__BUILD_PATH, "partition-storage.bin")
 
 __FLASH_PORT = "/dev/ttyUSB0"
 __BAUD_RATE = "115200"
@@ -55,53 +40,10 @@ write_flash -z \
 0x0 {__BOOTLOADER_BIN_PATH} \
 0x8000 {__PARTITION_TABLE_BIN} \
 0x10000 {__BINARY_BIN_PATH} \
-0x100000 {__PARTITION_STORAGE_BIN} \
-\
-"""
-
-__SPIFFS_BUILD_ARGS = f""" \
-python {__SPIFFSGEN_PATH} \
-0x1000 {__SPIFFS_IMAGE_FOLDER_PATH} {__PARTITION_STORAGE_BIN} \
---aligned-obj-ix-tables \
---no-magic \
---no-magic-len \
 \
 """
 
 __BUILD_ARGS = f"make bootloader app -j {cpu_count()}"
-
-
-def gen_ap_pass(
-    qrdump: bool = True,
-    output_filename: str = __AP_PASSWORD_FILENAME,
-    spiff_image_dir: str = __SPIFFS_IMAGE_FOLDER_PATH,
-    store_path_dir: str = __SPIFFS_IMAGE_STORE_FOLDER_PATH,
-) -> None:
-
-    if not os.path.exists(spiff_image_dir):
-        os.mkdir(spiff_image_dir)
-
-    if not os.path.exists(store_path_dir):
-        os.mkdir(store_path_dir)
-
-    fi, fs = (
-        os.path.join(spiff_image_dir, output_filename),
-        os.path.join(store_path_dir, output_filename),
-    )
-
-    t = "".join(random.choice(__AP_PASS_CHARS) for _ in range(__AP_PASS_LENGTH))
-
-    # Write AP password to spiffs image folder
-    with open(f"{fi}.txt", "w") as fp:
-        fp.write(t)
-
-    # Also dump the password into an output folder, for future references
-    with open(f"{fs}.txt", "w") as fp:
-        fp.write(t)
-
-    if qrdump:
-        # Also dump the qr code in the output folder
-        qrcode.make(t).save(f"{fs}.png")
 
 
 def _run() -> int:
@@ -115,7 +57,7 @@ def _run() -> int:
         "CPPFLAGS"
     ] = "-DSPIFFS_OBJ_META_LEN=4 -DSPIFFS_ALIGNED_OBJECT_INDEX_TABLES=4"
     _res = 0
-    for step in (__BUILD_ARGS, __SPIFFS_BUILD_ARGS, __FLASH_ARGS, __MONITOR_ARGS):
+    for step in (__BUILD_ARGS, __FLASH_ARGS, __MONITOR_ARGS):
         _res = _exec_args(step)
         if _res == -1:
             break
@@ -124,9 +66,6 @@ def _run() -> int:
 
 
 if __name__ == "__main__":
-
-    # Generate AP password into image and store folder
-    gen_ap_pass()
 
     # Build, Flash and Monitor
     sys.exit(_run())

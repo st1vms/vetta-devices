@@ -17,6 +17,7 @@
 #include "storage.h"
 #include "touch.h"
 #include "wifi_manager.h"
+#include "wifi_provision.h"
 
 #define CAPACITIVE_SENSOR_LED_EVENT_WAIT (0x01)
 #define CAPACITIVE_SENSOR_LED_EVENT (0UL)
@@ -36,13 +37,18 @@
 #define NETWORK_STA_START_WAIT (0x02)
 #define NETWORK_STA_START_EVENT (1UL)
 
+#define WIFI_STA_CONNECTED_BIT  BIT0
+#define WIFI_STA_DISCONNECTED_BIT BIT1
+#define WIFI_AP_STA_CONNECTED_BIT BIT2
+#define WIFI_AP_STA_DISCONNECTED_BIT BIT3
+
 /* FreeRTOS event group to signal network events*/
 static EventGroupHandle_t network_event_group;
 
-static const UBaseType_t LED_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
-static const UBaseType_t CAPACITIVE_SENSOR_TASK_PRIORITY = tskIDLE_PRIORITY;
-static const UBaseType_t BUTTON_TASK_PRIORITY = tskIDLE_PRIORITY;
-static const UBaseType_t NETWORK_TASK_PRIORITY = 1;
+static const UBaseType_t LED_SENSOR_TASK_PRIORITY = 2;
+static const UBaseType_t CAPACITIVE_SENSOR_TASK_PRIORITY = 1;
+static const UBaseType_t BUTTON_TASK_PRIORITY = 1;
+static const UBaseType_t NETWORK_TASK_PRIORITY = 2;
 
 static TaskHandle_t ledUpdaterTask = NULL;
 static TaskHandle_t capSensorTask = NULL;
@@ -139,6 +145,7 @@ static void capacitive_sensor_task(void *params)
             {
                 can_update_led = 0;
                 time_offset = 0;
+
                 // send led update event from sensor task
                 xTaskNotify(ledUpdaterTask, (1UL << CAPACITIVE_SENSOR_LED_EVENT), eSetBits);
             }
@@ -167,7 +174,7 @@ static void button_isr_handler(void *args)
     portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
-// Network function prototypes, for code clarity
+// Network wait function prototype, for code clarity
 static void waitNetworkStop(void);
 
 static void button_task(void *params)
@@ -217,15 +224,61 @@ static void button_task(void *params)
     }
 }
 
+static wifi_event_ap_staconnected_t* event_ap_staconnected;
+static wifi_event_ap_stadisconnected_t* event_ap_stadisconnected;
+static ip_event_got_ip_t* event_sta_gotip;
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
+{
+    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
 
-static const spiffs_string_t * upwd;
-static const spiffs_string_t * ussid;
+        // Station connected to lamp AP
+        event_ap_staconnected = (wifi_event_ap_staconnected_t*) event_data;
+
+        if(network_event_group){
+            xEventGroupSetBits(network_event_group, WIFI_AP_STA_CONNECTED_BIT);
+        }
+    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+
+        // Station disconnected from lamp AP
+        event_ap_stadisconnected = (wifi_event_ap_stadisconnected_t*) event_data;
+
+        if(network_event_group){
+            xEventGroupSetBits(network_event_group, WIFI_AP_STA_DISCONNECTED_BIT);
+        }
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    {
+        // Lamp starting station connection to home AP
+        printf("\nWIFI_EVENT_STA_START\n");
+    }
+    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
+    {
+        // Lamp station disconnected from home AP
+        printf("\nWIFI_EVENT_STA_DISCONNECTED\n");
+        // esp_wifi_connect();
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    {
+        // Lamp station received an IP address from home AP
+        event_sta_gotip = (ip_event_got_ip_t*) event_data;
+
+        if(network_event_group){
+            xEventGroupSetBits(network_event_group, WIFI_STA_CONNECTED_BIT);
+        }
+    }
+}
+
+static spiffs_string_t upwd;
+static spiffs_string_t ussid;
 static void network_task(void *params)
 {
     static uint32_t networkNotificationValue;
     static EventBits_t event_bits;
 
-    const spiffs_string_t * apwd = get_lamp_ap_password_string();
+    static unsigned char is_provisioning = 0;
+    static unsigned char sta_connected = 0;
+    static esp_err_t _err;
+
     for (;;)
     {
         if (xTaskNotifyWait(0x00,                      /* Don't clear any notification bits on entry. */
@@ -238,70 +291,125 @@ static void network_task(void *params)
 
             // Process network task event
             if (networkNotificationValue & NETWORK_AP_START_WAIT){
+
                 // Send blink animation event
                 xTaskNotify(ledUpdaterTask, (1UL << LED_BLINK_LOOP_START_EVENT), eSetBits);
 
-                if(ESP_OK == init_wifi_ap(network_event_group, !apwd ? NULL : apwd->string_array, !apwd ? 0 : apwd->string_len)){
+                if(ESP_OK == init_wifi_ap(&wifi_event_handler)){
 
                     // Lamp AP has been requested to start
-                    while(pdTRUE != xSemaphoreTake(networkStopSem, (TickType_t) 10 ))
+                    while(pdTRUE != xSemaphoreTake(networkStopSem, (TickType_t) 20 ))
                     {
+                        if(is_provisioning){
+                            // Wifi provisioning semi-blocking listen
+                            printf("\nprovision_listen...\n");
+                            if(ESP_OK == (_err = provision_listen(&ussid, &upwd))){
+                                // Retrieved SSID and password, ending provisioning
+                                deinit_wifi_provision();
+                                is_provisioning = 0;
+                                xSemaphoreGive(networkStopSem);
+
+                                if( ESP_OK == save_user_ap_ssid(ussid.string_array, ussid.string_len) && ESP_OK == save_user_ap_password(upwd.string_array, upwd.string_len))
+                                {
+                                    xTaskNotify(networkTask, (1UL << NETWORK_STA_START_WAIT), eSetBits);
+                                }
+
+                            }else if(_err == ESP_FAIL){
+                                deinit_wifi_provision();
+                                is_provisioning = 0;
+                                xSemaphoreGive(networkStopSem);
+                            }
+                            continue;
+                        }
+
                         // Wait for station events
                         event_bits = xEventGroupWaitBits(network_event_group,
-                        WIFI_AP_STA_CONNECTED_BIT,
+                        WIFI_AP_STA_CONNECTED_BIT | WIFI_AP_STA_DISCONNECTED_BIT,
                         pdFALSE,
                         pdFALSE,
-                        (TickType_t) 20);
+                        (TickType_t) 10);
+
 
                         // Process AP event
                         if (event_bits & WIFI_AP_STA_CONNECTED_BIT) {
-                            printf("\nWIFI_AP_STA_CONNECTED_BIT\n");
                             xEventGroupClearBits(network_event_group, WIFI_AP_STA_CONNECTED_BIT);
+
+                            if(event_ap_staconnected){
+                                printf("\nWIFI_AP_STA_CONNECTED_BIT "MACSTR" join, AID=%d\n",MAC2STR(event_ap_staconnected->mac), event_ap_staconnected->aid);
+                                // Initialize Wifi provisioning
+                                if(ESP_OK == init_wifi_provision()){
+                                    is_provisioning = 1;
+                                    continue;
+                                }
+                            }
+                        }
+
+                        if(event_bits & WIFI_AP_STA_DISCONNECTED_BIT){
+                            xEventGroupClearBits(network_event_group, WIFI_AP_STA_DISCONNECTED_BIT);
+
+                            if(event_ap_stadisconnected){
+                                printf("\nStation "MACSTR" leave, AID=%d\n",MAC2STR(event_ap_stadisconnected->mac), event_ap_stadisconnected->aid);
+                                // Deinit Wifi provisioning
+                                deinit_wifi_provision();
+                                is_provisioning = 0;
+                            }
                         }
                     }
-                    deinit_wifi();
+
+                    deinit_wifi(&wifi_event_handler);
                 }
 
                 stop_led_animation(ledStopSem, ledAnimationSem);
 
             }else if (networkNotificationValue & NETWORK_STA_START_WAIT)
             {
-                if(NULL != ussid && ussid->string_len > 0){
-                    // AP credentials are set
+                if((NULL != ussid.string_array && ussid.string_len > 0))
+                {
 
-                    if(ESP_OK == init_wifi_sta(network_event_group, ussid->string_array, ussid->string_len,
-                        (upwd != NULL && upwd->string_len > 0) ? upwd->string_array : NULL,
-                        upwd != NULL ? upwd->string_len : 0))
+                    if(ESP_OK == init_wifi_sta(&wifi_event_handler, ussid.string_array, ussid.string_len,
+                        (upwd.string_array != NULL && upwd.string_len > 0) ? upwd.string_array : NULL,
+                        upwd.string_array != NULL ? upwd.string_len : 0))
                     {
                         // Lamp AP has been requested to start
-                        while(pdTRUE != xSemaphoreTake(networkStopSem, (TickType_t) 10 ))
+                        while(pdTRUE != xSemaphoreTake(networkStopSem, (TickType_t) 20 ))
                         {
+                            if(sta_connected){
+                                printf("\nsta_connected...\n");
+                                continue;
+                            }
+
                             // Wait for AP events
                             event_bits = xEventGroupWaitBits(network_event_group,
-                            WIFI_STA_CONNECTED_BIT,
+                            WIFI_STA_CONNECTED_BIT | WIFI_STA_DISCONNECTED_BIT,
                             pdFALSE,
                             pdFALSE,
-                            (TickType_t) 20);
+                            (TickType_t) 10);
 
                             // Process AP event
                             if (event_bits & WIFI_STA_CONNECTED_BIT) {
-                                printf("\nWIFI_STA_CONNECTED_BIT\n");
                                 xEventGroupClearBits(network_event_group, WIFI_STA_CONNECTED_BIT);
+
+                                if(event_sta_gotip){
+                                    printf("\nnIP_EVENT_STA_GOT_IP -> ip is %s\n", ip4addr_ntoa(&(event_sta_gotip->ip_info.ip)));
+                                    sta_connected = 1;
+                                    continue;
+                                }
+                            }else if (event_bits & WIFI_STA_DISCONNECTED_BIT){
+                                xEventGroupClearBits(network_event_group, WIFI_STA_DISCONNECTED_BIT);
                             }
                         }
-
-                        deinit_wifi();
+                        deinit_wifi(&wifi_event_handler);
                     }
                 }
             }
+        }
 
-            // Critical section end
-            network_task_working = 0;
-            if (networkSem)
-            {
-                // Release sem, allowing button_task to stop waiting
-                xSemaphoreGive(networkSem);
-            }
+        xSemaphoreTake(networkStopSem, (TickType_t)10);
+        // Critical section end
+        network_task_working = 0;
+        if (networkSem){
+            // Release sem, allowing button_task to stop waiting
+            xSemaphoreGive(networkSem);
         }
     }
 }
@@ -309,21 +417,19 @@ static void network_task(void *params)
 
 static void waitNetworkStop(void)
 {
-    if (!networkSem || !networkStopSem || !network_task_working)
-    {
+    if (!networkSem || !networkStopSem || !network_task_working){
         return;
     }
 
-    printf("\nSIGNAL NETWORK STOP 1..\n");
     // Signal network task to stop and wait indefinitely until signaled
     if (pdTRUE == xSemaphoreGive(networkStopSem) &&
         pdTRUE == xSemaphoreTake(networkSem, portMAX_DELAY))
     {
         // Network task signaled us, reacquire stop semaphore and return
         xSemaphoreTake(networkStopSem, (TickType_t)10);
-        printf("\nSIGNAL NETWORK STOP 2..\n");
     }
 }
+
 
 void app_main()
 {
@@ -412,12 +518,12 @@ void app_main()
             printf("\nnvs_flash_init() error {%d}\n", _err);
         }
 
-        ussid = get_user_ap_ssid_string();
+        /* ussid = get_user_ap_ssid_string();
         upwd =  get_user_ap_password_string();
 
         // If STA SSID is set, try automatic reconnection
         if(NULL != ussid){
            xTaskNotify(networkTask, (1UL << NETWORK_STA_START_EVENT), eSetBits);
-        }
+        } */
     }
 }

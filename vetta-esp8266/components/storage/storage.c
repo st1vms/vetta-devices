@@ -7,18 +7,11 @@
 static esp_vfs_spiffs_conf_t conf = {
     .base_path = "/spiffs",
     .partition_label = NULL,
-    .max_files = 5,
+    .max_files = 4,
     .format_if_mount_failed = false};
 
 static size_t totalSize = 0;
 static size_t usedSize = 0;
-
-// Embedded string
-static spiffs_string_t ap_password_string = {
-    .filename = "/spiffs/ap.txt",
-    .string_len = AP_PASSWORD_LENGTH,
-    .string_array = {0},
-    .is_cached = 0};
 
 static spiffs_string_t user_ap_password_string = {
     .filename = "/spiffs/uap.txt",
@@ -41,8 +34,7 @@ static esp_err_t init_spiffs(void)
 
     if (ESP_OK != (_err = esp_vfs_spiffs_register(&conf)) ||
         ESP_OK != (_err = esp_spiffs_info(NULL, &totalSize, &usedSize)) ||
-        totalSize <= AP_PASSWORD_LENGTH ||
-        usedSize <= AP_PASSWORD_LENGTH)
+        !totalSize)
     {
         return _err;
     }
@@ -115,21 +107,7 @@ static esp_err_t write_spiffs_string(const char *filename, const uint8_t *str, s
     return ESP_OK;
 }
 
-const spiffs_string_t *get_lamp_ap_password_string(void)
-{
-    if (ESP_OK == init_spiffs())
-    {
-        if (ESP_OK == read_spiffs_string(&ap_password_string))
-        {
-            esp_vfs_spiffs_unregister(NULL);
-            return &ap_password_string;
-        }
-        esp_vfs_spiffs_unregister(NULL);
-    }
-    return NULL;
-}
-
-const spiffs_string_t *get_user_ap_password_string(void)
+spiffs_string_t * get_user_ap_password_string(void)
 {
     static esp_err_t _err;
 
@@ -145,7 +123,7 @@ const spiffs_string_t *get_user_ap_password_string(void)
     return NULL;
 }
 
-const spiffs_string_t *get_user_ap_ssid_string(void)
+spiffs_string_t * get_user_ap_ssid_string(void)
 {
 
     static esp_err_t _err;

@@ -1,7 +1,14 @@
-idf_component_register(SRCS "wifi_manager.c"
+idf_component_register(SRCS "wifi_manager.c" "wifi_provision.c"
                        INCLUDE_DIRS "include"
                        PRIVATE_HEADER   "freertos/FreeRTOS.h"
                                         "freertos/FreeRTOSConfig.h"
                                         "freertos/event_groups.h"
+                                        "esp_system.h"
                                         "esp_event.h"
-                                        "esp_err.h")
+                                        "nvs.h"
+                                        "nvs_flash.h"
+                                        "lwip/err.h"
+                                        "lwip/sockets.h"
+                                        "lwip/sys.h"
+                                        "esp_err.h"
+                                        "storage.h")

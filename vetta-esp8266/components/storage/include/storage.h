@@ -9,8 +9,6 @@ extern "C"
 
 #define MAX_STRING_LENGTH (65UL)
 
-// 12 Numerical digits
-#define AP_PASSWORD_LENGTH (12UL)
 #define MAX_PASSWORD_LENGTH (64UL)
 #define MAX_SSID_LENGTH (32UL)
 
@@ -23,10 +21,8 @@ extern "C"
 
     } spiffs_string_t;
 
-    const spiffs_string_t *get_lamp_ap_password_string(void);
-
-    const spiffs_string_t *get_user_ap_password_string(void);
-    const spiffs_string_t *get_user_ap_ssid_string(void);
+    spiffs_string_t * get_user_ap_password_string(void);
+    spiffs_string_t * get_user_ap_ssid_string(void);
 
     esp_err_t save_user_ap_password(const uint8_t *ap_pwd, size_t pwd_length);
     esp_err_t save_user_ap_ssid(const uint8_t *ap_ssid, size_t ssid_length);

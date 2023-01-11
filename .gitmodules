@@ -2,7 +2,3 @@
 	path = ESP8266_RTOS_SDK
 	url = https://github.com/espressif/ESP8266_RTOS_SDK.git
 	branch = release/v3.4
-[submodule "dynamic-bits"]
-	path = dynamic-bits
-	url = https://github.com/st1vms/dynamic-bits
-	branch = v1.2.0-vetta
