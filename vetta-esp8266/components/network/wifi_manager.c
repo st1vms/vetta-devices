@@ -9,7 +9,9 @@
 static unsigned char is_initialized = 0;
 static wifi_mode_t current_mode;
 
-static esp_err_t parse_sta_credentials(wifi_config_t * lamp_sta_config, const uint8_t *sta_ssid_str, size_t sta_ssid_size, const uint8_t *sta_pwd_str, size_t sta_pwd_size)
+static esp_err_t parse_sta_credentials(wifi_config_t * lamp_sta_config,
+const uint8_t *sta_ssid_str, size_t sta_ssid_size,
+const uint8_t *sta_pwd_str, size_t sta_pwd_size)
 {
 
     if (!sta_ssid_str ||
@@ -20,8 +22,8 @@ static esp_err_t parse_sta_credentials(wifi_config_t * lamp_sta_config, const ui
         return ESP_ERR_INVALID_ARG;
     }
 
-    memset(lamp_sta_config->sta.password, 0, MAX_PASSPHRASE_LEN);
-    memset(lamp_sta_config->sta.ssid, 0, MAX_SSID_LEN);
+    memset(lamp_sta_config->sta.password, 0, MAX_PASSPHRASE_LEN*sizeof(uint8_t));
+    memset(lamp_sta_config->sta.ssid, 0, MAX_SSID_LEN*sizeof(uint8_t));
 
     const uint8_t *stmp = sta_ssid_str;
     uint8_t *p = lamp_sta_config->sta.password, *s = lamp_sta_config->sta.ssid;
@@ -38,7 +40,7 @@ static esp_err_t parse_sta_credentials(wifi_config_t * lamp_sta_config, const ui
         }
         if (sta_pwd_size != 0)
         {
-            memset(lamp_sta_config->sta.password, 0, MAX_PASSPHRASE_LEN);
+            memset(lamp_sta_config->sta.password, 0, MAX_PASSPHRASE_LEN*sizeof(uint8_t));
             return ESP_FAIL;
         }
     }
@@ -53,13 +55,13 @@ static esp_err_t parse_sta_credentials(wifi_config_t * lamp_sta_config, const ui
         }
         else
         {
-            memset(lamp_sta_config->sta.ssid, 0, MAX_SSID_LEN);
+            memset(lamp_sta_config->sta.ssid, 0, MAX_SSID_LEN*sizeof(uint8_t));
             return ESP_FAIL;
         }
     }
     if (sta_ssid_size != 0)
     {
-        memset(lamp_sta_config->sta.ssid, 0, MAX_SSID_LEN);
+        memset(lamp_sta_config->sta.ssid, 0, MAX_SSID_LEN*sizeof(uint8_t));
         return ESP_FAIL;
     }
 
@@ -70,11 +72,15 @@ static esp_err_t init_wifi(wifi_mode_t wifi_mode, esp_event_handler_t event_hand
 {
     static esp_err_t _err;
 
+    if (is_initialized){
+        return ESP_OK;
+    }
+
     tcpip_adapter_init();
-    wifi_init_config_t _init_cfg = WIFI_INIT_CONFIG_DEFAULT();
-    if (ESP_OK != (_err = esp_wifi_init(&_init_cfg)))
+    if (ESP_OK == (_err = esp_event_loop_create_default()))
     {
-        if(ESP_OK != (_err = esp_event_loop_create_default()) ||
+        wifi_init_config_t _init_cfg = WIFI_INIT_CONFIG_DEFAULT();
+        if(ESP_OK != (_err = esp_wifi_init(&_init_cfg)) ||
             ESP_OK != (_err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, event_handler, NULL)) ||
             ESP_OK != (_err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, event_handler, NULL)) ||
             ESP_OK != (_err = esp_wifi_set_mode(wifi_mode)))
@@ -91,11 +97,7 @@ static esp_err_t init_wifi(wifi_mode_t wifi_mode, esp_event_handler_t event_hand
 
 esp_err_t init_wifi_ap(esp_event_handler_t event_handler)
 {
-
-    if (is_initialized && WIFI_MODE_AP == current_mode)
-    {
-        return ESP_OK;
-    }
+    static esp_err_t _err;
 
     wifi_config_t lamp_ap_config = {
         .ap = {
@@ -105,8 +107,6 @@ esp_err_t init_wifi_ap(esp_event_handler_t event_handler)
             .authmode = WIFI_AUTH_OPEN
         }
     };
-
-    static esp_err_t _err;
 
     //lamp_ap_config.ap.authmode = WIFI_AUTH_MAX;
     if (ESP_OK != (_err = init_wifi(WIFI_MODE_AP, event_handler)) ||
@@ -121,13 +121,11 @@ esp_err_t init_wifi_ap(esp_event_handler_t event_handler)
     return ESP_OK;
 }
 
-esp_err_t init_wifi_sta(esp_event_handler_t event_handler, const uint8_t *sta_ssid_str, size_t sta_ssid_size, const uint8_t *sta_pwd_str, size_t sta_pwd_size)
+esp_err_t init_wifi_sta(esp_event_handler_t event_handler,
+    const uint8_t *sta_ssid_str,size_t sta_ssid_size,
+    const uint8_t *sta_pwd_str,size_t sta_pwd_size)
 {
-
-    if (is_initialized && WIFI_MODE_AP == current_mode)
-    {
-        return ESP_ERR_INVALID_ARG;
-    }
+    static esp_err_t _err;
 
     wifi_config_t lamp_sta_config = {
         .sta = {
@@ -135,8 +133,6 @@ esp_err_t init_wifi_sta(esp_event_handler_t event_handler, const uint8_t *sta_ss
             .password = {0}
         }
     };
-
-    static esp_err_t _err;
 
     if (ESP_OK != parse_sta_credentials(&lamp_sta_config, sta_ssid_str, sta_ssid_size, sta_pwd_str, sta_pwd_size))
     {

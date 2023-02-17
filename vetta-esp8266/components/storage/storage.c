@@ -49,7 +49,7 @@ static esp_err_t read_spiffs_string(spiffs_string_t *out_string)
         NULL == out_string->filename ||
         NULL == out_string->string_array ||
         out_string->string_len == 0 ||
-        out_string->string_len > MAX_STRING_LENGTH)
+        out_string->string_len > MAX_SPIFFS_STRING_LENGTH)
     {
         return ESP_ERR_INVALID_ARG;
     }
@@ -65,11 +65,11 @@ static esp_err_t read_spiffs_string(spiffs_string_t *out_string)
         return ESP_FAIL;
     }
 
-    memset(out_string->string_array, 0, out_string->string_len + 1);
+    memset(out_string->string_array, 0, (out_string->string_len + 1)*sizeof(uint8_t));
 
     if (out_string->string_len != fread(out_string->string_array, sizeof(uint8_t), out_string->string_len, fp))
     {
-        memset(out_string->string_array, 0, out_string->string_len + 1);
+        memset(out_string->string_array, 0, (out_string->string_len + 1)*sizeof(uint8_t));
         fclose(fp);
         return ESP_FAIL;
     }
@@ -85,7 +85,7 @@ static esp_err_t write_spiffs_string(const char *filename, const uint8_t *str, s
     if (NULL == filename ||
         NULL == str ||
         0 == str_len ||
-        str_len > MAX_STRING_LENGTH)
+        str_len > MAX_SPIFFS_STRING_LENGTH)
     {
         return ESP_ERR_INVALID_ARG;
     }

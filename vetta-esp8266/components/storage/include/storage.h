@@ -7,7 +7,7 @@ extern "C"
 {
 #endif
 
-#define MAX_STRING_LENGTH (65UL)
+#define MAX_SPIFFS_STRING_LENGTH (65UL)
 
 #define MAX_PASSWORD_LENGTH (64UL)
 #define MAX_SSID_LENGTH (32UL)
@@ -16,7 +16,7 @@ extern "C"
     {
         const char *filename;
         size_t string_len;
-        uint8_t string_array[MAX_STRING_LENGTH];
+        uint8_t string_array[MAX_SPIFFS_STRING_LENGTH];
         unsigned char is_cached : 1;
 
     } spiffs_string_t;

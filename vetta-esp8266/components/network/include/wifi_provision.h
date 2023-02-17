@@ -8,8 +8,7 @@ extern "C"
 {
 #endif
 
-#define PROVISION_CLIENT_PORT   (50041)
-#define PROVISION_SERVER_PORT   (50042)
+#define PROVISION_SERVER_PORT   (50030)
 #define PROVISION_SERVER_BUFFER_SIZE (128UL)
 
 esp_err_t init_wifi_provision(void);
