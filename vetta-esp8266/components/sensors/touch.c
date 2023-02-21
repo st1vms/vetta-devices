@@ -32,12 +32,11 @@ esp_err_t init_touch_sensor_module(void)
     return _err;
 }
 
-unsigned char is_touch(uint16_t analog_value, uint16_t calibrated_idle_read)
+unsigned char is_touch(int32_t analog_value, uint16_t calibrated_idle_read)
 {
-    if (analog_value == DEFAULT_SENSOR_READING_VALUE)
+    if (analog_value <= TOUCH_DETECTION_TRESHOLD)
     {
         return 0;
     }
-
     return abs(analog_value - calibrated_idle_read) >= TOUCH_DETECTION_TRESHOLD ? 1 : 0;
 }

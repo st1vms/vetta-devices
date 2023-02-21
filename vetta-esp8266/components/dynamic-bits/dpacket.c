@@ -36,7 +36,7 @@ char RegisterPacket(packet_id_t packet_id, int *packet_format, size_t format_siz
         return 0;
     }
 
-    memset(PACKET_TABLE[packet_id], 0, MAX_PACKET_FIELDS*sizeof(int));
+    memset(PACKET_TABLE[packet_id], 0, MAX_PACKET_FIELDS * sizeof(int));
     size_t i = 0;
     for (; packet_format != NULL && i < format_size; packet_format++, i++)
     {
@@ -45,7 +45,7 @@ char RegisterPacket(packet_id_t packet_id, int *packet_format, size_t format_siz
 
     if (i != format_size)
     {
-        memset(PACKET_TABLE[packet_id], 0, MAX_PACKET_FIELDS*sizeof(int));
+        memset(PACKET_TABLE[packet_id], 0, MAX_PACKET_FIELDS * sizeof(int));
         return 0;
     }
 
@@ -92,7 +92,6 @@ char NewPacket(dpacket_t packet_p, packet_id_t packet_id)
     return 1;
 }
 
-
 char AddSerializable(dpacket_t dpacket_p, serializable_type_t stype, data_union_t datav)
 {
     if (dpacket_p == NULL ||
@@ -112,23 +111,26 @@ char AddSerializable(dpacket_t dpacket_p, serializable_type_t stype, data_union_
 
     node_p->stype = stype;
 
-    if(stype == UTF8_STRING_STYPE){
-        node_p->data.utf8_str_v = (utf8_string_t) {
+    if (stype == UTF8_STRING_STYPE)
+    {
+        node_p->data.utf8_str_v = (utf8_string_t){
             .length = datav.utf8_str_v.length,
-            .utf8_string = {0}
-        };
+            .utf8_string = {0}};
 
-        if(node_p->data.utf8_str_v.length >= MAX_STRING_LENGTH){
+        if (node_p->data.utf8_str_v.length >= MAX_STRING_LENGTH)
+        {
             return 0;
         }
 
-        memset(node_p->data.utf8_str_v.utf8_string, 0, MAX_STRING_LENGTH*sizeof(UInt8));
-        UInt8 * tmp = datav.utf8_str_v.utf8_string;
-        for(size_t i = 0; tmp != NULL && i < node_p->data.utf8_str_v.length; tmp++, i++){
+        memset(node_p->data.utf8_str_v.utf8_string, 0, MAX_STRING_LENGTH * sizeof(UInt8));
+        UInt8 *tmp = datav.utf8_str_v.utf8_string;
+        for (size_t i = 0; tmp != NULL && i < node_p->data.utf8_str_v.length; tmp++, i++)
+        {
             node_p->data.utf8_str_v.utf8_string[i] = *tmp;
         }
-
-    }else{
+    }
+    else
+    {
         node_p->data = datav;
     }
 
@@ -161,7 +163,7 @@ char AddSerializable(dpacket_t dpacket_p, serializable_type_t stype, data_union_
     return 0;
 }
 
-char AddUTF8StringSerializable(dpacket_t dpacket_p, const unsigned char * string_v, size_t string_len)
+char AddUTF8StringSerializable(dpacket_t dpacket_p, const unsigned char *string_v, size_t string_len)
 {
     if (dpacket_p == NULL ||
         !IsValidList(dpacket_p->data_list) ||
@@ -179,14 +181,14 @@ char AddUTF8StringSerializable(dpacket_t dpacket_p, const unsigned char * string
     }
 
     node_p->stype = UTF8_STRING_STYPE;
-    node_p->data.utf8_str_v = (utf8_string_t) {
+    node_p->data.utf8_str_v = (utf8_string_t){
         .length = string_len,
-        .utf8_string = {0}
-    };
+        .utf8_string = {0}};
 
-    memset(node_p->data.utf8_str_v.utf8_string, 0, MAX_STRING_LENGTH*sizeof(UInt8));
-    const UInt8 * tmp = string_v;
-    for(size_t i = 0; tmp != NULL && i < node_p->data.utf8_str_v.length; tmp++, i++){
+    memset(node_p->data.utf8_str_v.utf8_string, 0, MAX_STRING_LENGTH * sizeof(UInt8));
+    const UInt8 *tmp = string_v;
+    for (size_t i = 0; tmp != NULL && i < node_p->data.utf8_str_v.length; tmp++, i++)
+    {
         node_p->data.utf8_str_v.utf8_string[i] = *tmp;
     }
 

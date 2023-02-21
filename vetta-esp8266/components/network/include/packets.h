@@ -5,10 +5,10 @@ extern "C"
 {
 #endif
 
-#define PROVISION_PACKET_ID 0
+#define PROVISION_PACKET_ID 2
 #define PROVISION_PACKET_SIZE 2
 
-unsigned char RegisterNetworkPackets();
+    unsigned char RegisterNetworkPackets();
 
 #ifdef __cplusplus
 }

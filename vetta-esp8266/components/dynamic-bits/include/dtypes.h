@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <stdint.h>
 
-#define MAX_STRING_LENGTH   (0xff)
+#define MAX_STRING_LENGTH (0xff)
 
 #ifdef __cplusplus
 extern "C"

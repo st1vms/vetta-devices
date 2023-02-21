@@ -9,8 +9,15 @@
 #include "driver/pwm.h"
 #include "led.h"
 
-static uint32_t _current_state;
-static led_animation_t current_led_animation;
+static uint32_t _current_state = LED_OFF_DUTY_CYCLE;
+
+static led_animation_t current_led_animation = {
+    .canceled = 0,
+    .is_playing = 0,
+    .reps = 0,
+    .step_size = 0,
+    .steps_buf = NULL};
+static unsigned char led_module_init = 0;
 
 // From sdkconfig.h
 #ifndef CONFIG_FREERTOS_HZ
@@ -34,14 +41,17 @@ esp_err_t init_led_module(void)
         ESP_OK == (_err = pwm_start()))
     {
         _current_state = LED_OFF_DUTY_CYCLE;
+        led_module_init = 1;
         return ESP_OK;
     }
     return _err;
 }
 
+// TODO Implement "smooth" PWM
+
 static esp_err_t set_duty(uint32_t duty)
 {
-    if (ESP_OK == pwm_set_duty(PWM_CHANNEL, duty) && ESP_OK == pwm_start())
+    if (led_module_init && ESP_OK == pwm_set_duty(PWM_CHANNEL, duty) && ESP_OK == pwm_start())
     {
         _current_state = duty;
         return ESP_OK;
@@ -57,6 +67,7 @@ esp_err_t led_shutdown(void)
         ESP_OK == (_err = pwm_stop(PWM_CHANNEL)) &&
         ESP_OK == (_err = pwm_deinit()))
     {
+        led_module_init = 0;
         return ESP_OK;
     }
     return _err;
@@ -118,16 +129,18 @@ esp_err_t play_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t led
 
     while (i <= current_led_animation.step_size)
     {
-        if(pdTRUE == xSemaphoreTake(ledStopSem, current_led_animation.steps_buf[i].start_delay / portTICK_PERIOD_MS)){
+        if (pdTRUE == xSemaphoreTake(ledStopSem, current_led_animation.steps_buf[i].start_delay / portTICK_PERIOD_MS))
+        {
             break;
         }
         set_duty(current_led_animation.steps_buf[i].duty_cycle);
-        if(pdTRUE == xSemaphoreTake(ledStopSem, current_led_animation.steps_buf[i].end_delay / portTICK_PERIOD_MS)){
+        if (pdTRUE == xSemaphoreTake(ledStopSem, current_led_animation.steps_buf[i].end_delay / portTICK_PERIOD_MS))
+        {
             break;
         }
 
-        if(++i == current_led_animation.step_size && (current_led_animation.reps == -1 ||
-            (current_led_animation.reps)-- > 0))
+        if (++i == current_led_animation.step_size && (current_led_animation.reps == -1 ||
+                                                       (current_led_animation.reps)-- > 0))
         {
             i = 0;
         }
@@ -143,6 +156,11 @@ esp_err_t play_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t led
 
 void stop_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t ledAnimationSem)
 {
+    if (!current_led_animation.is_playing)
+    {
+        return;
+    }
+
     if (pdTRUE == xSemaphoreGive(ledStopSem) &&
         pdTRUE == xSemaphoreTake(ledAnimationSem, portMAX_DELAY))
     {
@@ -156,11 +174,24 @@ esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(signed char reps)
         (led_animation_step_t){
             .duty_cycle = LED_HIGH_DUTY_CYCLE,
             .start_delay = 0,
-            .end_delay = 150},
+            .end_delay = 500},
         (led_animation_step_t){
             .duty_cycle = LED_OFF_DUTY_CYCLE,
             .start_delay = 0,
-            .end_delay = 150}
-    };
+            .end_delay = 500}};
+    return set_led_animation(2, _OFF_HIGH_BLINK_STEPS, reps);
+}
+
+esp_err_t SET_FAST_BLINK_ANIMATION(signed char reps)
+{
+    static led_animation_step_t _OFF_HIGH_BLINK_STEPS[] = {
+        (led_animation_step_t){
+            .duty_cycle = LED_HIGH_DUTY_CYCLE,
+            .start_delay = 0,
+            .end_delay = 250},
+        (led_animation_step_t){
+            .duty_cycle = LED_OFF_DUTY_CYCLE,
+            .start_delay = 0,
+            .end_delay = 250}};
     return set_led_animation(2, _OFF_HIGH_BLINK_STEPS, reps);
 }

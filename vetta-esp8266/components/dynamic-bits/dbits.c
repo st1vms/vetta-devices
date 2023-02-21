@@ -350,10 +350,10 @@ char DeserializeBuffer(unsigned char *buffer, const size_t buffer_size, dpacket_
             data.utf8_str_v = (utf8_string_t){
                 .length = 0,
                 .utf8_string = {0}};
-            memset(data.utf8_str_v.utf8_string, 0, MAX_STRING_LENGTH*sizeof(UInt8));
+            memset(data.utf8_str_v.utf8_string, 0, MAX_STRING_LENGTH * sizeof(UInt8));
 
             if (NULL == (buffer = DeserializeUTF8String(buffer, &n, &bit_count, &(data.utf8_str_v))) ||
-                !AddUTF8StringSerializable(packet_out,data.utf8_str_v.utf8_string, data.utf8_str_v.length ))
+                !AddUTF8StringSerializable(packet_out, data.utf8_str_v.utf8_string, data.utf8_str_v.length))
             {
                 FreePacket(packet_out);
                 return 0;

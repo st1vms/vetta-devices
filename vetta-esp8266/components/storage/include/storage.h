@@ -17,12 +17,11 @@ extern "C"
         const char *filename;
         size_t string_len;
         uint8_t string_array[MAX_SPIFFS_STRING_LENGTH];
-        unsigned char is_cached : 1;
 
     } spiffs_string_t;
 
-    spiffs_string_t * get_user_ap_password_string(void);
-    spiffs_string_t * get_user_ap_ssid_string(void);
+    esp_err_t get_user_ap_password_string(spiffs_string_t *out_string);
+    esp_err_t get_user_ap_ssid_string(spiffs_string_t *out_string);
 
     esp_err_t save_user_ap_password(const uint8_t *ap_pwd, size_t pwd_length);
     esp_err_t save_user_ap_ssid(const uint8_t *ap_ssid, size_t ssid_length);

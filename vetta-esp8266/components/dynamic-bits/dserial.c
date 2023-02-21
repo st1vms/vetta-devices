@@ -405,20 +405,39 @@ static void ByteIncrementCheck(unsigned char **buffer, size_t *bit_count, size_t
     }
 }
 
-static unsigned char *IncrementUnsignedInteger(unsigned char *buffer,
-                                               size_t *m_bytes,
-                                               size_t *bit_count,
-                                               unsigned char uint_bitsize,
-                                               uintptr_t out)
+unsigned char *DeserializeBoolean(unsigned char *buffer,
+                                  size_t *m_bytes,
+                                  size_t *bit_count,
+                                  Boolean *out)
 {
-    UInt64 v = 0;
-    if (((UInt64*)out) == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, uint_bitsize))
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, 1))
+    {
+        return NULL;
+    }
+
+    ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+    *out = (*buffer & BIT_MASKS[*bit_count]) ? 1 : 0;
+    *bit_count += 1;
+    return buffer;
+}
+
+unsigned char *DeserializeUInt8(unsigned char *buffer,
+                                size_t *m_bytes,
+                                size_t *bit_count,
+                                unsigned_int_size_t uint_size,
+                                unsigned char is_header,
+                                UInt8 *out)
+{
+    *out = is_header ? 1 : 0;
+
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, uint_size))
     {
         return NULL;
     }
 
     for (unsigned char bit_pos = 0;
-         bit_pos < uint_bitsize && buffer != NULL && bit_count != NULL;
+         bit_pos < uint_size && buffer != NULL && bit_count != NULL;
          bit_pos++)
     {
         ByteIncrementCheck(&buffer, bit_count, m_bytes);
@@ -430,22 +449,267 @@ static unsigned char *IncrementUnsignedInteger(unsigned char *buffer,
 
         if (*buffer & BIT_MASKS[*bit_count])
         {
-            v += (1ULL << bit_pos);
+            *out += (1ULL << bit_pos);
         }
         *bit_count += 1;
     }
-    *((UInt64*)out) += v;
 
     return buffer;
 }
 
-static unsigned char *IncrementSignedInteger(unsigned char *buffer,
-                                             size_t *m_bytes,
-                                             size_t *bit_count,
-                                             unsigned char int_bitsize,
-                                             intptr_t *out)
+unsigned char *DeserializeUInt16(unsigned char *buffer,
+                                 size_t *m_bytes,
+                                 size_t *bit_count,
+                                 unsigned_int_size_t uint_size,
+                                 UInt16 *out)
 {
-    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, int_bitsize))
+    *out = 0;
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, uint_size))
+    {
+        return NULL;
+    }
+
+    for (unsigned char bit_pos = 0;
+         bit_pos < uint_size && buffer != NULL && bit_count != NULL;
+         bit_pos++)
+    {
+        ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+        if (NULL == buffer || bit_count == NULL)
+        {
+            return NULL;
+        }
+
+        if (*buffer & BIT_MASKS[*bit_count])
+        {
+            *out += (1ULL << bit_pos);
+        }
+        *bit_count += 1;
+    }
+
+    return buffer;
+}
+
+unsigned char *DeserializeUInt32(unsigned char *buffer,
+                                 size_t *m_bytes,
+                                 size_t *bit_count,
+                                 unsigned_int_size_t uint_size,
+                                 UInt32 *out)
+{
+    *out = 0;
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, uint_size))
+    {
+        return NULL;
+    }
+
+    for (unsigned char bit_pos = 0;
+         bit_pos < uint_size && buffer != NULL && bit_count != NULL;
+         bit_pos++)
+    {
+        ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+        if (NULL == buffer || bit_count == NULL)
+        {
+            return NULL;
+        }
+
+        if (*buffer & BIT_MASKS[*bit_count])
+        {
+            *out += (1ULL << bit_pos);
+        }
+        *bit_count += 1;
+    }
+
+    return buffer;
+}
+
+unsigned char *DeserializeUInt64(unsigned char *buffer,
+                                 size_t *m_bytes,
+                                 size_t *bit_count,
+                                 unsigned_int_size_t uint_size,
+                                 UInt64 *out)
+{
+    *out = 0;
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, uint_size))
+    {
+        return NULL;
+    }
+
+    for (unsigned char bit_pos = 0;
+         bit_pos < uint_size && buffer != NULL && bit_count != NULL;
+         bit_pos++)
+    {
+        ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+        if (NULL == buffer || bit_count == NULL)
+        {
+            return NULL;
+        }
+
+        if (*buffer & BIT_MASKS[*bit_count])
+        {
+            *out += (1ULL << bit_pos);
+        }
+        *bit_count += 1;
+    }
+
+    return buffer;
+}
+
+unsigned char *DeserializeInt8(unsigned char *buffer,
+                               size_t *m_bytes,
+                               size_t *bit_count,
+                               unsigned_int_size_t int_size,
+                               Int8 *out)
+{
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, int_size))
+    {
+        return NULL;
+    }
+
+    ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+    // 0 POSITIVE | 1 NEGATIVE
+    const unsigned char sign = (*buffer & BIT_MASKS[*bit_count]) ? 1 : 0;
+    *bit_count += 1;
+
+    UInt8 tmp = 0;
+
+    for (unsigned char bit_pos = 0;
+         bit_pos < int_size && buffer != NULL && bit_count != NULL;
+         bit_pos++)
+    {
+        ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+        if (NULL == buffer || bit_count == NULL || out == NULL)
+        {
+            return NULL;
+        }
+
+        if (*buffer & BIT_MASKS[*bit_count])
+        {
+            tmp += (1ULL << bit_pos);
+        }
+        *bit_count += 1;
+    }
+
+    if (sign)
+    {
+        *out = -(tmp);
+    }
+    else
+    {
+        *out = (Int8)tmp;
+    }
+
+    return buffer;
+}
+
+unsigned char *DeserializeInt16(unsigned char *buffer,
+                                size_t *m_bytes,
+                                size_t *bit_count,
+                                unsigned_int_size_t int_size,
+                                Int16 *out)
+{
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, int_size))
+    {
+        return NULL;
+    }
+
+    ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+    // 0 POSITIVE | 1 NEGATIVE
+    const unsigned char sign = (*buffer & BIT_MASKS[*bit_count]) ? 1 : 0;
+    *bit_count += 1;
+
+    UInt16 tmp = 0;
+
+    for (unsigned char bit_pos = 0;
+         bit_pos < int_size && buffer != NULL && bit_count != NULL;
+         bit_pos++)
+    {
+        ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+        if (NULL == buffer || bit_count == NULL || out == NULL)
+        {
+            return NULL;
+        }
+
+        if (*buffer & BIT_MASKS[*bit_count])
+        {
+            tmp += (1ULL << bit_pos);
+        }
+        *bit_count += 1;
+    }
+
+    if (sign)
+    {
+        *out = -(tmp);
+    }
+    else
+    {
+        *out = (Int16)tmp;
+    }
+
+    return buffer;
+}
+
+unsigned char *DeserializeInt32(unsigned char *buffer,
+                                size_t *m_bytes,
+                                size_t *bit_count,
+                                unsigned_int_size_t int_size,
+                                Int32 *out)
+{
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, int_size))
+    {
+        return NULL;
+    }
+
+    ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+    // 0 POSITIVE | 1 NEGATIVE
+    const unsigned char sign = (*buffer & BIT_MASKS[*bit_count]) ? 1 : 0;
+    *bit_count += 1;
+
+    UInt32 tmp = 0;
+
+    for (unsigned char bit_pos = 0;
+         bit_pos < int_size && buffer != NULL && bit_count != NULL;
+         bit_pos++)
+    {
+        ByteIncrementCheck(&buffer, bit_count, m_bytes);
+
+        if (NULL == buffer || bit_count == NULL || out == NULL)
+        {
+            return NULL;
+        }
+
+        if (*buffer & BIT_MASKS[*bit_count])
+        {
+            tmp += (1ULL << bit_pos);
+        }
+        *bit_count += 1;
+    }
+
+    if (sign)
+    {
+        *out = -(tmp);
+    }
+    else
+    {
+        *out = (Int32)tmp;
+    }
+
+    return buffer;
+}
+
+unsigned char *DeserializeInt64(unsigned char *buffer,
+                                size_t *m_bytes,
+                                size_t *bit_count,
+                                unsigned_int_size_t int_size,
+                                Int64 *out)
+{
+    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, int_size))
     {
         return NULL;
     }
@@ -459,7 +723,7 @@ static unsigned char *IncrementSignedInteger(unsigned char *buffer,
     UInt64 tmp = 0;
 
     for (unsigned char bit_pos = 0;
-         bit_pos < int_bitsize && buffer != NULL && bit_count != NULL;
+         bit_pos < int_size && buffer != NULL && bit_count != NULL;
          bit_pos++)
     {
         ByteIncrementCheck(&buffer, bit_count, m_bytes);
@@ -486,139 +750,6 @@ static unsigned char *IncrementSignedInteger(unsigned char *buffer,
     }
 
     return buffer;
-}
-
-unsigned char *DeserializeBoolean(unsigned char *buffer,
-                                  size_t *m_bytes,
-                                  size_t *bit_count,
-                                  Boolean *out)
-{
-    if (out == NULL || !DeserializeArgCheck(buffer, m_bytes, bit_count, 1))
-    {
-        return NULL;
-    }
-
-    ByteIncrementCheck(&buffer, bit_count, m_bytes);
-
-    *out = (*buffer & BIT_MASKS[*bit_count]) ? 1 : 0;
-    *bit_count += 1;
-    return buffer;
-}
-
-unsigned char *DeserializeUInt8(unsigned char *buffer,
-                                size_t *m_bytes,
-                                size_t *bit_count,
-                                unsigned_int_size_t uint_size,
-                                unsigned char is_header,
-                                UInt8 *out)
-{
-    *out = is_header ? 1 : 0;
-    if (!(buffer = IncrementUnsignedInteger(buffer, m_bytes, bit_count, uint_size, (uintptr_t)out)))
-    {
-        return NULL;
-    }
-    return buffer;
-}
-
-unsigned char *DeserializeUInt16(unsigned char *buffer,
-                                 size_t *m_bytes,
-                                 size_t *bit_count,
-                                 unsigned_int_size_t uint_size,
-                                 UInt16 *out)
-{
-    *out = 0;
-    if (!(buffer = IncrementUnsignedInteger(buffer, m_bytes, bit_count, uint_size, (uintptr_t)out)))
-    {
-        return NULL;
-    }
-    return buffer;
-}
-
-unsigned char *DeserializeUInt32(unsigned char *buffer,
-                                 size_t *m_bytes,
-                                 size_t *bit_count,
-                                 unsigned_int_size_t uint_size,
-                                 UInt32 *out)
-{
-    *out = 0;
-    if (!(buffer = IncrementUnsignedInteger(buffer, m_bytes, bit_count, uint_size, (uintptr_t)out)))
-    {
-        return NULL;
-    }
-    return buffer;
-}
-
-unsigned char *DeserializeUInt64(unsigned char *buffer,
-                                 size_t *m_bytes,
-                                 size_t *bit_count,
-                                 unsigned_int_size_t uint_size,
-                                 UInt64 *out)
-{
-    *out = 0;
-    if (!(buffer = IncrementUnsignedInteger(buffer, m_bytes, bit_count, uint_size, (uintptr_t)out)))
-    {
-        return NULL;
-    }
-    return buffer;
-}
-
-unsigned char *DeserializeInt8(unsigned char *buffer,
-                               size_t *m_bytes,
-                               size_t *bit_count,
-                               unsigned_int_size_t int_size,
-                               Int8 *out)
-{
-    Int8 *v = out;
-    if (v == NULL)
-    {
-        return NULL;
-    }
-    return IncrementSignedInteger(buffer, m_bytes, bit_count, int_size, (intptr_t *)v);
-}
-
-unsigned char *DeserializeInt16(unsigned char *buffer,
-                                size_t *m_bytes,
-                                size_t *bit_count,
-                                unsigned_int_size_t int_size,
-                                Int16 *out)
-{
-    Int16 *v = out;
-    if (v == NULL)
-    {
-        return NULL;
-    }
-    *v = 0;
-    return IncrementSignedInteger(buffer, m_bytes, bit_count, int_size, (intptr_t *)v);
-}
-
-unsigned char *DeserializeInt32(unsigned char *buffer,
-                                size_t *m_bytes,
-                                size_t *bit_count,
-                                unsigned_int_size_t int_size,
-                                Int32 *out)
-{
-    Int32 *v = out;
-    if (v == NULL)
-    {
-        return NULL;
-    }
-    *v = 0;
-    return IncrementSignedInteger(buffer, m_bytes, bit_count, int_size, (intptr_t *)v);
-}
-
-unsigned char *DeserializeInt64(unsigned char *buffer,
-                                size_t *m_bytes,
-                                size_t *bit_count,
-                                unsigned_int_size_t int_size,
-                                Int64 *out)
-{
-    Int64 *v = out;
-    if (v == NULL)
-    {
-        return NULL;
-    }
-    *v = 0;
-    return IncrementSignedInteger(buffer, m_bytes, bit_count, int_size, (intptr_t *)v);
 }
 
 unsigned char *DeserializeDouble(unsigned char *buffer,

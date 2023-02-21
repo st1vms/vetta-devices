@@ -25,7 +25,7 @@ extern "C"
 #define CONFIG_ESP8266_WIFI_TX_PKT_NUM 5
 #endif
 
-// AP/Station configuration
+    // AP/Station configuration
 
 #define LAMP_AP_SSID "VettaV1"
 

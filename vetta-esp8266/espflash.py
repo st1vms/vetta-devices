@@ -20,12 +20,12 @@ __PARTITION_TABLE_BIN = os.path.join(__BUILD_PATH, "partition-table.bin")
 __BINARY_BIN_PATH = os.path.join(__BUILD_PATH, "vetta-esp8266.bin")
 
 __FLASH_PORT = "/dev/ttyUSB0"
-__BAUD_RATE = "115200"
+__BAUD_RATE = "74880"
 __FLASH_MODE = "dio"
 __FLASH_FREQ = "80m"
 __FLASH_SIZE = "4MB"
 
-__MONITOR_ARGS = "make monitor MONITORBAUD=9600"
+__MONITOR_ARGS = "make monitor MONITORBAUD=74880"
 
 __FLASH_ARGS = f""" \
 python {__ESPTOOL_PATH} \

@@ -1,5 +1,8 @@
+#include <stdio.h>
 #include <string.h>
 #include <sys/unistd.h>
+#include <sys/stat.h>
+#include "errno.h"
 #include "esp_err.h"
 #include "esp_spiffs.h"
 #include "storage.h"
@@ -8,22 +11,13 @@ static esp_vfs_spiffs_conf_t conf = {
     .base_path = "/spiffs",
     .partition_label = NULL,
     .max_files = 4,
-    .format_if_mount_failed = false};
+    .format_if_mount_failed = true};
 
 static size_t totalSize = 0;
 static size_t usedSize = 0;
 
-static spiffs_string_t user_ap_password_string = {
-    .filename = "/spiffs/uap.txt",
-    .string_len = 0,
-    .string_array = {0},
-    .is_cached = 0};
-
-static spiffs_string_t user_ap_ssid_string = {
-    .filename = "/spiffs/ssid.txt",
-    .string_len = 0,
-    .string_array = {0},
-    .is_cached = 0};
+static const char *user_ap_pwd_filename = "/spiffs/uap.txt";
+static const char *user_ap_ssid_filename = "/spiffs/ssid.txt";
 
 static esp_err_t init_spiffs(void)
 {
@@ -42,40 +36,30 @@ static esp_err_t init_spiffs(void)
     return ESP_OK;
 }
 
-static esp_err_t read_spiffs_string(spiffs_string_t *out_string)
+static esp_err_t read_spiffs_string(const char *filename, spiffs_string_t *out_string)
 {
 
-    if (NULL == out_string ||
-        NULL == out_string->filename ||
-        NULL == out_string->string_array ||
-        out_string->string_len == 0 ||
-        out_string->string_len > MAX_SPIFFS_STRING_LENGTH)
-    {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    if (out_string->is_cached)
-    {
-        return ESP_OK;
-    }
-
-    FILE *fp = fopen(out_string->filename, "r");
+    FILE *fp = fopen(filename, "r");
     if (!fp)
     {
         return ESP_FAIL;
     }
 
-    memset(out_string->string_array, 0, (out_string->string_len + 1)*sizeof(uint8_t));
+    out_string->string_len = 0;
+    memset(out_string->string_array, 0, MAX_SPIFFS_STRING_LENGTH * sizeof(uint8_t));
 
-    if (out_string->string_len != fread(out_string->string_array, sizeof(uint8_t), out_string->string_len, fp))
+    int len = fread(out_string->string_array, sizeof(uint8_t), MAX_SPIFFS_STRING_LENGTH, fp);
+    if (len <= 0 || len >= MAX_SPIFFS_STRING_LENGTH)
     {
-        memset(out_string->string_array, 0, (out_string->string_len + 1)*sizeof(uint8_t));
+        memset(out_string->string_array, 0, MAX_SPIFFS_STRING_LENGTH * sizeof(uint8_t));
         fclose(fp);
         return ESP_FAIL;
     }
-
     fclose(fp);
-    out_string->is_cached = 1;
+
+    // NULL terminate string
+    out_string->string_array[len] = 0;
+    out_string->string_len = len;
     return ESP_OK;
 }
 
@@ -107,37 +91,45 @@ static esp_err_t write_spiffs_string(const char *filename, const uint8_t *str, s
     return ESP_OK;
 }
 
-spiffs_string_t * get_user_ap_password_string(void)
+esp_err_t get_user_ap_password_string(spiffs_string_t *out_string)
 {
+    if (!out_string)
+    {
+        return ESP_FAIL;
+    }
     static esp_err_t _err;
 
     if (ESP_OK == (_err = init_spiffs()))
     {
-        if (ESP_OK == (_err = read_spiffs_string(&user_ap_password_string)))
+        if (ESP_OK == (_err = read_spiffs_string(user_ap_pwd_filename, out_string)))
         {
             esp_vfs_spiffs_unregister(NULL);
-            return &user_ap_password_string;
+            return ESP_OK;
         }
         esp_vfs_spiffs_unregister(NULL);
     }
-    return NULL;
+    return ESP_FAIL;
 }
 
-spiffs_string_t * get_user_ap_ssid_string(void)
+esp_err_t get_user_ap_ssid_string(spiffs_string_t *out_string)
 {
+    if (!out_string)
+    {
+        return ESP_FAIL;
+    }
 
     static esp_err_t _err;
 
     if (ESP_OK == (_err = init_spiffs()))
     {
-        if (ESP_OK == (_err = read_spiffs_string(&user_ap_ssid_string)))
+        if (ESP_OK == (_err = read_spiffs_string(user_ap_ssid_filename, out_string)))
         {
             esp_vfs_spiffs_unregister(NULL);
-            return &user_ap_ssid_string;
+            return ESP_OK;
         }
         esp_vfs_spiffs_unregister(NULL);
     }
-    return NULL;
+    return ESP_FAIL;
 }
 
 esp_err_t save_user_ap_password(const uint8_t *ap_pwd, size_t pwd_length)
@@ -146,10 +138,8 @@ esp_err_t save_user_ap_password(const uint8_t *ap_pwd, size_t pwd_length)
 
     if (ESP_OK == (_err = init_spiffs()))
     {
-        if (ESP_OK == (_err = write_spiffs_string(user_ap_password_string.filename, ap_pwd, pwd_length)))
+        if (ESP_OK == (_err = write_spiffs_string(user_ap_pwd_filename, ap_pwd, pwd_length)))
         {
-            user_ap_password_string.string_len = pwd_length;
-            user_ap_password_string.is_cached = 0;
             esp_vfs_spiffs_unregister(NULL);
             return ESP_OK;
         }
@@ -164,10 +154,9 @@ esp_err_t save_user_ap_ssid(const uint8_t *ap_ssid, size_t ssid_length)
 
     if (ESP_OK == (_err = init_spiffs()))
     {
-        if (ESP_OK == (_err = write_spiffs_string(user_ap_ssid_string.filename, ap_ssid, ssid_length)))
+
+        if (ESP_OK == (_err = write_spiffs_string(user_ap_ssid_filename, ap_ssid, ssid_length)))
         {
-            user_ap_ssid_string.string_len = ssid_length;
-            user_ap_ssid_string.is_cached = 0;
             esp_vfs_spiffs_unregister(NULL);
             return ESP_OK;
         }
@@ -181,14 +170,10 @@ void spiffs_data_reset(void)
     static esp_err_t _err;
     if (ESP_OK == (_err = init_spiffs()))
     {
-
         // Unlink Wifi STA credentials
+        unlink(user_ap_ssid_filename);
 
-        unlink(user_ap_ssid_string.filename);
-        user_ap_ssid_string.is_cached = 0;
-
-        unlink(user_ap_password_string.filename);
-        user_ap_password_string.is_cached = 0;
+        unlink(user_ap_pwd_filename);
 
         esp_vfs_spiffs_unregister(NULL);
     }

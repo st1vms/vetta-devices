@@ -86,7 +86,7 @@ extern "C"
      */
     extern char AddSerializable(dpacket_t dpacket_p, serializable_type_t stype, data_union_t datav);
 
-        /**
+    /**
      * @brief Add a Serializable to the end of the packet serializable list
      *
      * @param dpacket_p Packet structure pointer
@@ -94,7 +94,7 @@ extern "C"
      * @param string_len string length (excluding last 0, if present)
      * @return 1 on success, 0 in case of errors
      */
-    extern char AddUTF8StringSerializable(dpacket_t dpacket_p, const unsigned char * string_v, size_t string_len);
+    extern char AddUTF8StringSerializable(dpacket_t dpacket_p, const unsigned char *string_v, size_t string_len);
 
 #ifdef __cplusplus
 }

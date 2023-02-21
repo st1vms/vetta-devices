@@ -39,6 +39,7 @@ extern "C"
     } led_animation_t;
 
     esp_err_t SET_BLINK_OFF_HIGH_ANIMATION(signed char reps);
+    esp_err_t SET_FAST_BLINK_ANIMATION(signed char reps);
 
     esp_err_t play_led_animation(SemaphoreHandle_t ledStopSem, SemaphoreHandle_t ledAnimationSem);
 
