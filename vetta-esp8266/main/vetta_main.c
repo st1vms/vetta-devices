@@ -50,9 +50,6 @@
 #define WIFI_START_STA_EVENT_WAIT (0x10)
 #define WIFI_START_STA_EVENT (1UL << 4UL)
 
-#define WIFI_STA_CONNECTED_EVENT_WAIT (0x20)
-#define WIFI_STA_CONNECTED_EVENT (1UL << 5UL)
-
 /* FreeRTOS event group to signal network events*/
 
 static const UBaseType_t LED_SENSOR_TASK_PRIORITY = 7;
@@ -110,7 +107,7 @@ static void led_updater_task(void *params)
 }
 
 // Activate to log capacitive sensor readings
-//#define LOG_CAP_SENSOR
+#define LOG_CAP_SENSOR
 #ifdef LOG_CAP_SENSOR
     static const unsigned long int debug_rate_millis = 500;
     static TickType_t debug_start = 0, debug_end = 0;
@@ -203,6 +200,8 @@ static void button_isr_handler(void *args)
     portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
+static unsigned char is_provisioning = 0;
+static unsigned char credentials_ok = 0;
 static unsigned char ap_credentials_available = 0;
 static spiffs_string_t upwd;
 static spiffs_string_t ussid;
@@ -211,6 +210,7 @@ static void reset_persistent_storage(void)
     // Reset SPIFFS persistent storage
     spiffs_data_reset();
     ap_credentials_available = 0;
+    credentials_ok = 0;
 
     // Clear references
     if (ussid.string_array != NULL)
@@ -254,10 +254,10 @@ static void button_task(void *params)
                     xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
                     break;
                 case PRESS_EVENT_DISCOVERY:
-
-                    reset_persistent_storage();
-
-                    xTaskNotify(networkTask, WIFI_START_AP_EVENT, eSetBits);
+                    if(!is_provisioning && (!credentials_ok || !ap_credentials_available)){
+                        reset_persistent_storage();
+                        xTaskNotify(networkTask, WIFI_START_AP_EVENT, eSetBits);
+                    }
                     break;
                 default:
                     break;
@@ -267,13 +267,15 @@ static void button_task(void *params)
     }
 }
 
-static unsigned char network_task_working = 0;
-static unsigned char is_provisioning = 0;
-static unsigned char sta_connected = 0;
+#define TIME_DELAY_RECONNECTION_MILLIS 3000
+#define MAX_CONNECTION_RETRIES 2
+static unsigned char connection_retries = 0;
+
 static tcpip_adapter_ip_info_t ip_info;
-static wifi_event_ap_staconnected_t *event_ap_staconnected;
-static wifi_event_ap_stadisconnected_t *event_ap_stadisconnected;
-static int s_retry_num = 0;
+static unsigned char network_task_working = 0;
+static unsigned char sta_connected = 0;
+static wifi_event_ap_staconnected_t *event_ap_staconnected = NULL;
+static wifi_event_ap_stadisconnected_t *event_ap_stadisconnected = NULL;
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
@@ -295,15 +297,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
-        /* if(cap_sensor_active){
-            cap_sensor_active = 0;
-            TIME_DELAY_MILLIS(200);
-        } */
         printf("\nCONNECTING TO WIFI\n");
-
-        // Lamp starting station connection to home AP
-        esp_wifi_connect();
-
+        if(credentials_ok == 0){
+            credentials_ok = (ESP_OK == esp_wifi_connect()) ? 1: 0;
+            if(credentials_ok){
+                printf("\nCREDENTIALS OK!\n");
+            }
+        }else{
+            esp_wifi_connect();
+        }
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
@@ -313,35 +315,44 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         sta_connected = 0;
 
-        // TODO Implement reconnection
-        ap_credentials_available = 0;
-
-        xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
-
-        if(!cap_sensor_active){
-            TIME_DELAY_MILLIS(1000);
-            cap_sensor_active = 1;
+        if(ap_credentials_available && connection_retries < MAX_CONNECTION_RETRIES){
+            // Reconnection attempt
+            if(ESP_OK == esp_wifi_connect()){
+                credentials_ok = 1;
+            }
+            connection_retries++;
+        }else if(credentials_ok && ap_credentials_available){
+            // Connection was successfull once
+            // Retrying until credentials are available
+            connection_retries = 0;
+            if(ESP_OK != esp_wifi_connect()){
+                // Extending delay time after failure;
+                TIME_DELAY_MILLIS(TIME_DELAY_RECONNECTION_MILLIS);
+            }
+        }else{
+            reset_persistent_storage();
+            xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
         }
 
+        TIME_DELAY_MILLIS(1000);
+        cap_sensor_active = 1;
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         // Lamp station received an IP address from home AP
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-
         if(event->ip_changed){
             ip_info = event->ip_info;
         }
 
-        ESP_LOGI("WIFI STA", "Got IP: %s",
-                ip4addr_ntoa(&ip_info.ip));
+        printf("\nSTATION CONNECTED, IP: %s\n", ip4addr_ntoa(&ip_info.ip));
 
-        s_retry_num = 0;
-        xTaskNotify(networkTask, WIFI_STA_CONNECTED_EVENT, eSetBits);
-        if(!cap_sensor_active){
-            TIME_DELAY_MILLIS(1000);
-            cap_sensor_active = 1;
-        }
+        connection_retries = 0;
+
+        TIME_DELAY_MILLIS(500);
+        cap_sensor_active = 1;
+
+        sta_connected = 1;
     }
 }
 
@@ -370,7 +381,6 @@ static void network_task(void *params)
 
     for (;;)
     {
-
         if (xTaskNotifyWait(0x00,                      /* Don't clear any notification bits on entry. */
                             0xffffffffUL,              /* Reset the notification value to 0 on exit. */
                             &networkNotificationValue, /* Notified value */
@@ -428,9 +438,8 @@ static void network_task(void *params)
                 printf("\nSTATION START EVENT FIRED\n");
 
                 cap_sensor_active = 0;
-                TIME_DELAY_MILLIS(500); // Give time to cap sensor for deactivating
+                TIME_DELAY_MILLIS(1000); // Give time to cap sensor for deactivating
 
-                //shutdown_wifi();
                 if (ap_credentials_available &&
                     ESP_OK == init_wifi_sta(&wifi_event_handler,
                                             ussid.string_array, ussid.string_len,
@@ -440,15 +449,11 @@ static void network_task(void *params)
                     network_task_working = 1;
                 }
             }
-            else if (networkNotificationValue & WIFI_STA_CONNECTED_EVENT_WAIT)
-            {
-                sta_connected = 1;
-            }
         }
 
         if (sta_connected && network_task_working)
         {
-            printf("\nSTATION CONNECTED, IP: %s\n", ip4addr_ntoa(&ip_info.ip));
+            // Network Ops
         }
         else if (ap_credentials_available && !network_task_working)
         {
