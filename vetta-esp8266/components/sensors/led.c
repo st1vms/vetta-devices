@@ -17,7 +17,6 @@ static led_animation_t current_led_animation = {
     .reps = 0,
     .step_size = 0,
     .steps_buf = NULL};
-static unsigned char led_module_init = 0;
 
 // From sdkconfig.h
 #ifndef CONFIG_FREERTOS_HZ
@@ -41,7 +40,6 @@ esp_err_t init_led_module(void)
         ESP_OK == (_err = pwm_start()))
     {
         _current_state = LED_OFF_DUTY_CYCLE;
-        led_module_init = 1;
         return ESP_OK;
     }
     return _err;
@@ -51,7 +49,7 @@ esp_err_t init_led_module(void)
 
 static esp_err_t set_duty(uint32_t duty)
 {
-    if (led_module_init && ESP_OK == pwm_set_duty(PWM_CHANNEL, duty) && ESP_OK == pwm_start())
+    if (ESP_OK == pwm_set_duty(PWM_CHANNEL, duty) && ESP_OK == pwm_start())
     {
         _current_state = duty;
         return ESP_OK;
@@ -67,7 +65,6 @@ esp_err_t led_shutdown(void)
         ESP_OK == (_err = pwm_stop(PWM_CHANNEL)) &&
         ESP_OK == (_err = pwm_deinit()))
     {
-        led_module_init = 0;
         return ESP_OK;
     }
     return _err;

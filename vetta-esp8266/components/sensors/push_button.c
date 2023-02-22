@@ -34,7 +34,7 @@ esp_err_t init_button(gpio_isr_t isr_handler)
     return gpio_isr_handler_add(BUTTON_GPIO_NUMBER, isr_handler, NULL);
 }
 
-static inline TickType_t getTickMillis()
+static TickType_t getTickMillis()
 {
     return xTaskGetTickCount() * portTICK_PERIOD_MS;
 }

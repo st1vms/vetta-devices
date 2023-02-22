@@ -119,7 +119,7 @@ esp_err_t init_wifi_sta(esp_event_handler_t event_handler,
         .sta = {
             .ssid = {0},
             .password = {0},
-            .threshold.authmode = WIFI_AUTH_WPA2_WPA3_PSK}};
+            .threshold.authmode = WIFI_AUTH_WPA2_PSK}};
 
     if (ESP_OK != parse_sta_credentials(&lamp_sta_config, sta_ssid_str, sta_ssid_size, sta_pwd_str, sta_pwd_size))
     {
