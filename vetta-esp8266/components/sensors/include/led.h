@@ -80,6 +80,8 @@ extern "C"
     */
     esp_err_t led_set_next(void);
 
+    uint8_t led_get_state(void);
+
 #ifdef __cplusplus
 }
 #endif

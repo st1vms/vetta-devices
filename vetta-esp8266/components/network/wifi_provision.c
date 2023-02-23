@@ -5,7 +5,6 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <lwip/netdb.h>
-#include "lwip/ip_addr.h"
 #include "dbits.h"
 #include "packets.h"
 #include "wifi_provision.h"

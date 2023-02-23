@@ -31,7 +31,7 @@ void FreePacket(dpacket_t packet)
 char RegisterPacket(packet_id_t packet_id, int *packet_format, size_t format_size)
 {
 
-    if (packet_format == NULL || packet_id > PACKET_TABLE_SIZE || format_size > MAX_PACKET_FIELDS)
+    if (packet_format == NULL || packet_id >= PACKET_TABLE_SIZE || format_size == 0 || format_size > MAX_PACKET_FIELDS)
     {
         return 0;
     }

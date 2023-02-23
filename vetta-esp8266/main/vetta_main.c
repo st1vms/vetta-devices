@@ -19,6 +19,8 @@
 #include "packets.h"
 #include "wifi_manager.h"
 #include "wifi_provision.h"
+#include "discovery.h"
+#include "listener.h"
 
 // Sensors Events
 
@@ -107,7 +109,7 @@ static void led_updater_task(void *params)
 }
 
 // Activate to log capacitive sensor readings
-#define LOG_CAP_SENSOR
+//#define LOG_CAP_SENSOR
 #ifdef LOG_CAP_SENSOR
     static const unsigned long int debug_rate_millis = 500;
     static TickType_t debug_start = 0, debug_end = 0;
@@ -315,13 +317,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         sta_connected = 0;
 
-        if(ap_credentials_available && connection_retries < MAX_CONNECTION_RETRIES){
+        if(network_task_working && ap_credentials_available && connection_retries < MAX_CONNECTION_RETRIES){
             // Reconnection attempt
             if(ESP_OK == esp_wifi_connect()){
                 credentials_ok = 1;
             }
             connection_retries++;
-        }else if(credentials_ok && ap_credentials_available){
+        }else if(network_task_working && credentials_ok && ap_credentials_available){
             // Connection was successfull once
             // Retrying until credentials are available
             connection_retries = 0;
@@ -329,7 +331,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                 // Extending delay time after failure;
                 TIME_DELAY_MILLIS(TIME_DELAY_RECONNECTION_MILLIS);
             }
-        }else{
+        }else if(network_task_working){
             reset_persistent_storage();
             xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
         }
@@ -352,7 +354,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         TIME_DELAY_MILLIS(500);
         cap_sensor_active = 1;
 
-        sta_connected = 1;
+        if(ESP_OK == init_discovery_server(ip_info.ip.addr) &&
+            ESP_OK == init_listener_server(ip_info.ip.addr))
+        {
+            sta_connected = 1;
+        }else{
+            reset_persistent_storage();
+            xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+        }
     }
 }
 
@@ -361,14 +370,21 @@ void shutdown_wifi(void)
     if (network_task_working)
     {
         printf("\nWIFI CLOSING\n");
-        network_task_working = 0;
         if (is_provisioning)
         {
             deinit_wifi_provision();
         }
         is_provisioning = 0;
+
+        if(sta_connected){
+            close_discovery_server();
+            close_listener_server();
+        }
+        sta_connected = 0;
+
         deinit_wifi(&wifi_event_handler);
     }
+    network_task_working = 0;
 }
 
 static void network_task(void *params)
@@ -454,6 +470,16 @@ static void network_task(void *params)
         if (sta_connected && network_task_working)
         {
             // Network Ops
+
+            // Discovery Responder listen call
+            if(ESP_FAIL == discovery_listen(led_get_state())){
+                printf("\nDISCOVERY SERVER FAILED\n");
+                xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                continue;
+            }
+
+            // Lamp server listen call, returning event
+            //listener_listen();
         }
         else if (ap_credentials_available && !network_task_working)
         {
@@ -492,7 +518,7 @@ void app_main()
     static esp_err_t _err;
 
     // Initialize led module and capacitive sensor module, set the led to low
-    if (ESP_OK != (_err = init_led_module()) || ESP_OK != (_err = led_low()))
+    if (ESP_OK != (_err = init_led_module()) || ESP_OK != (_err = led_off()))
     {
         printf("\ninit_led_module() error {%d}\n", _err);
     }

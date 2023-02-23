@@ -192,3 +192,8 @@ esp_err_t SET_FAST_BLINK_ANIMATION(signed char reps)
             .end_delay = 250}};
     return set_led_animation(2, _OFF_HIGH_BLINK_STEPS, reps);
 }
+
+
+uint8_t led_get_state(void){
+    return _current_state;
+}

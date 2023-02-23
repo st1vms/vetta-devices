@@ -1,7 +1,7 @@
 #ifndef __DPACKET_H
 
 // Max number of packets
-#define PACKET_TABLE_SIZE 3
+#define PACKET_TABLE_SIZE 5
 
 // Max number of fields x packet
 #define MAX_PACKET_FIELDS 5
