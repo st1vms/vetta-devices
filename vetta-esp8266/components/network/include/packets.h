@@ -5,6 +5,9 @@ extern "C"
 {
 #endif
 
+#define PING_PACKET_ID 0
+#define PING_PACKET_SIZE 1
+
 #define BROKER_DISCOVERY_REQUEST_FLAG_BROKER 1
 
 #define BROKER_DISCOVERY_REQUEST_PACKET_ID 1
@@ -15,6 +18,9 @@ extern "C"
 
 #define PROVISION_PACKET_ID 3
 #define PROVISION_PACKET_SIZE 2
+
+#define LAMP_STATE_CHANGE_PACKET_ID 4
+#define LAMP_STATE_CHANGE_PACKET_SIZE 1
 
     unsigned char RegisterNetworkPackets();
 

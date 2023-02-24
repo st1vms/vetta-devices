@@ -24,14 +24,26 @@
 
 // Sensors Events
 
-#define CAPACITIVE_SENSOR_LED_EVENT_WAIT (0x01)
-#define CAPACITIVE_SENSOR_LED_EVENT (1UL << 0UL)
+#define LED_NEXT_EVENT_WAIT (0x01)
+#define LED_NEXT_EVENT (1UL << 0UL)
 
 #define LED_BLINK_START_EVENT_WAIT (0x02)
 #define LED_BLINK_START_EVENT (1UL << 1UL)
 
 #define LED_BLINK_LOOP_START_EVENT_WAIT (0x04)
 #define LED_BLINK_LOOP_START_EVENT (1UL << 2UL)
+
+#define LED_OFF_EVENT_WAIT (0x08)
+#define LED_OFF_EVENT (1UL << 3UL)
+
+#define LED_LOW_EVENT_WAIT (0x10)
+#define LED_LOW_EVENT (1UL << 4UL)
+
+#define LED_MEDIUM_EVENT_WAIT (0x20)
+#define LED_MEDIUM_EVENT (1UL << 5UL)
+
+#define LED_HIGH_EVENT_WAIT (0x40)
+#define LED_HIGH_EVENT (1UL << 6UL)
 
 #define BUTTON_INTR_EVENT_WAIT (0x01)
 #define BUTTON_INTR_EVENT (1UL << 0UL)
@@ -83,7 +95,7 @@ static void led_updater_task(void *params)
                             portMAX_DELAY) == pdTRUE)
         {
 
-            if (ledNotificationValue & CAPACITIVE_SENSOR_LED_EVENT_WAIT)
+            if (ledNotificationValue & LED_NEXT_EVENT_WAIT)
             {
                 // Led update from sensor
                 led_set_next();
@@ -103,6 +115,18 @@ static void led_updater_task(void *params)
                     play_led_animation(ledStopSem, ledAnimationSem);
                     led_off();
                 }
+            }else if (ledNotificationValue & LED_OFF_EVENT_WAIT)
+            {
+                led_off();
+            }else if (ledNotificationValue & LED_LOW_EVENT_WAIT)
+            {
+                led_low();
+            }else if (ledNotificationValue & LED_MEDIUM_EVENT_WAIT)
+            {
+                led_medium();
+            }else if (ledNotificationValue & LED_HIGH_EVENT_WAIT)
+            {
+                led_high();
             }
         }
     }
@@ -111,7 +135,7 @@ static void led_updater_task(void *params)
 // Activate to log capacitive sensor readings
 //#define LOG_CAP_SENSOR
 #ifdef LOG_CAP_SENSOR
-    static const unsigned long int debug_rate_millis = 500;
+    static const unsigned long int debug_rate_millis = READING_DELAY_MILLIS;
     static TickType_t debug_start = 0, debug_end = 0;
 #endif
 
@@ -175,7 +199,7 @@ static void capacitive_sensor_task(void *params)
                 time_offset = 0;
 
                 // send led update event from sensor task
-                xTaskNotify(ledUpdaterTask, CAPACITIVE_SENSOR_LED_EVENT, eSetBits);
+                xTaskNotify(ledUpdaterTask, LED_NEXT_EVENT, eSetBits);
             }
         }
 
@@ -478,8 +502,31 @@ static void network_task(void *params)
                 continue;
             }
 
-            // Lamp server listen call, returning event
-            //listener_listen();
+            listener_event_t event = listener_listen();
+            switch (event)
+            {
+            case RESULT_FAIL:
+                printf("\nDISCOVERY SERVER FAILED\n");
+                xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                break;
+            case RESULT_LED_OFF:
+                xTaskNotify(ledUpdaterTask, LED_OFF_EVENT, eSetBits);
+                break;
+            case RESULT_LED_LOW:
+                xTaskNotify(ledUpdaterTask, LED_LOW_EVENT, eSetBits);
+                break;
+            case RESULT_LED_MEDIUM:
+                xTaskNotify(ledUpdaterTask, LED_MEDIUM_EVENT, eSetBits);
+                break;
+            case RESULT_LED_HIGH:
+                xTaskNotify(ledUpdaterTask, LED_HIGH_EVENT, eSetBits);
+                break;
+            case RESULT_LED_NEXT:
+                xTaskNotify(ledUpdaterTask, LED_NEXT_EVENT, eSetBits);
+                break;
+            default:
+                break;
+            }
         }
         else if (ap_credentials_available && !network_task_working)
         {

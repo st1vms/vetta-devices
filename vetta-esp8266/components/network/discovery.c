@@ -51,7 +51,7 @@ void close_discovery_server(void){
     }
 }
 
-static esp_err_t send_discovery_response(unsigned int networkAddr, uint8_t current_lamp_state){
+static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp_state){
 
     int client_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (client_socket < 0)
@@ -72,7 +72,7 @@ static esp_err_t send_discovery_response(unsigned int networkAddr, uint8_t curre
         return ESP_FAIL;
     }
 
-    if(!AddSerializable(&dpacket, UINT32_STYPE, (data_union_t){.decimal_v.u32_v = ntohs(ipAddress)}) ||
+    if(!AddSerializable(&dpacket, UINT32_STYPE, (data_union_t){.decimal_v.u32_v = ipAddress}) ||
         !AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = 0}) ||
         !AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = current_lamp_state}))
     {

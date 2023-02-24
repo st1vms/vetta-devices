@@ -195,5 +195,16 @@ esp_err_t SET_FAST_BLINK_ANIMATION(signed char reps)
 
 
 uint8_t led_get_state(void){
-    return _current_state;
+    switch (_current_state)
+    {
+    case LED_OFF_DUTY_CYCLE:
+        return 0;
+    case LED_LOW_DUTY_CYCLE:
+        return 1;
+    case LED_MEDIUM_DUTY_CYCLE:
+        return 2;
+    case LED_HIGH_DUTY_CYCLE:
+        return 3;
+    }
+    return 0;
 }
