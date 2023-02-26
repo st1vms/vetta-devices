@@ -341,13 +341,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         sta_connected = 0;
 
-        if(network_task_working && ap_credentials_available && connection_retries < MAX_CONNECTION_RETRIES){
+        if(ap_credentials_available &&
+            connection_retries < MAX_CONNECTION_RETRIES){
             // Reconnection attempt
             if(ESP_OK == esp_wifi_connect()){
                 credentials_ok = 1;
             }
             connection_retries++;
-        }else if(network_task_working && credentials_ok && ap_credentials_available){
+        }else if(credentials_ok &&
+            ap_credentials_available){
             // Connection was successfull once
             // Retrying until credentials are available
             connection_retries = 0;
@@ -355,9 +357,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                 // Extending delay time after failure;
                 TIME_DELAY_MILLIS(TIME_DELAY_RECONNECTION_MILLIS);
             }
-        }else if(network_task_working){
-            reset_persistent_storage();
-            xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+        }else if(!credentials_ok){
+            if(network_task_working){
+                xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+            }
+            if(ap_credentials_available){
+                reset_persistent_storage();
+            }
         }
 
         TIME_DELAY_MILLIS(1000);

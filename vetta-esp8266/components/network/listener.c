@@ -163,8 +163,8 @@ esp_err_t send_ping(){
 listener_event_t listener_listen(void){
 
     static struct timeval time_out_v;
-    time_out_v.tv_sec = 1; // 2 seconds
-    time_out_v.tv_usec = 0; //500000; // 500ms
+    time_out_v.tv_sec = 0;
+    time_out_v.tv_usec = 500000; // 500ms
 
     fd_set server_set, client_set;
 
@@ -191,6 +191,7 @@ listener_event_t listener_listen(void){
             return RESULT_NO_ACTION;
         }
 
+        setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&time_out_v, sizeof(time_out_v));
 
         // TODO Speed up handshake
         printf("\nSocket Accepted\n");
@@ -199,6 +200,7 @@ listener_event_t listener_listen(void){
         if (!ssl_session) {
             close(client_socket);
             client_socket = -1;
+            printf("\nERROR SSL_new()\n");
             return RESULT_NO_ACTION;
         }
 
@@ -212,6 +214,7 @@ listener_event_t listener_listen(void){
 
             SSL_free(ssl_session);
             ssl_session = NULL;
+            printf("\nERROR SSL_accept()\n");
             return RESULT_NO_ACTION;
         }
         printf("\nSSL SESSION CREATED\n");
@@ -220,7 +223,6 @@ listener_event_t listener_listen(void){
     FD_ZERO(&client_set);
     FD_SET(client_socket, &client_set);
 
-    printf("\nSELECTING CLIENT\n");
     // select
     ret = select(client_socket + 1, &client_set, NULL, NULL, &time_out_v);
     if (ret == -1){

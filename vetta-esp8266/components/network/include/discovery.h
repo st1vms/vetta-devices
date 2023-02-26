@@ -8,7 +8,8 @@ extern "C"
 {
 #endif
 
-#define DISCOVERY_SERVER_PORT 50000
+#define DISCOVERY_SERVER_PORT 50005
+#define BROKER_DISCOVERY_SERVER_PORT 50000
 #define DISCOVERY_SERVER_BUFFER_SIZE (128UL)
 
     esp_err_t init_discovery_server(in_addr_t ip_info);

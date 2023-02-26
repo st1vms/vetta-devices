@@ -30,7 +30,7 @@ esp_err_t init_discovery_server(in_addr_t ip){
     memset(&serverAddr, 0, sizeof(serverAddr));
 
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = 0;
+    serverAddr.sin_addr.s_addr = ipAddress;
     serverAddr.sin_port = htons(DISCOVERY_SERVER_PORT);
 
     if(0 > bind(server_socket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)))
@@ -64,7 +64,7 @@ static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp
 
     destAddr.sin_family = AF_INET;
     destAddr.sin_addr.s_addr = networkAddr;
-    destAddr.sin_port = htons(DISCOVERY_SERVER_PORT);
+    destAddr.sin_port = htons(BROKER_DISCOVERY_SERVER_PORT);
 
     dpacket_struct_t dpacket;
     if(!NewPacket(&dpacket, BROKER_DISCOVERY_ACK_PACKET_ID)){
