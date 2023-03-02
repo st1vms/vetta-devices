@@ -10,15 +10,17 @@
 #include "discovery.h"
 
 static in_addr_t ipAddress = 0;
+static uint32_t lampSeed = 0;
 
 static int server_socket = -1;
 
 static unsigned char recvBuffer[DISCOVERY_SERVER_BUFFER_SIZE];
 static unsigned char sendBuffer[DISCOVERY_SERVER_BUFFER_SIZE];
 
-esp_err_t init_discovery_server(in_addr_t ip){
+esp_err_t init_discovery_server(in_addr_t ip, uint32_t lamp_seed){
 
     ipAddress = ip;
+    lampSeed = lamp_seed;
 
     server_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (server_socket < 0)
@@ -51,7 +53,7 @@ void close_discovery_server(void){
     }
 }
 
-static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp_state){
+static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp_state, uint8_t is_managed){
 
     int client_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (client_socket < 0)
@@ -73,8 +75,10 @@ static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp
     }
 
     if(!AddSerializable(&dpacket, UINT32_STYPE, (data_union_t){.decimal_v.u32_v = ipAddress}) ||
-        !AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = 0}) ||
-        !AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = current_lamp_state}))
+        !AddSerializable(&dpacket, UINT32_STYPE, (data_union_t){.decimal_v.u32_v = lampSeed}) ||
+        !AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = LAMP_MODEL_INTEGER}) ||
+        !AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = current_lamp_state}) ||
+        !AddSerializable(&dpacket, BOOLEAN_STYPE, (data_union_t){.boolean_v = is_managed}))
     {
         FreePacket(&dpacket);
         close(client_socket);
@@ -104,7 +108,7 @@ static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp
 }
 
 
-esp_err_t discovery_listen(uint8_t current_lamp_state){
+esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed){
 
     static struct sockaddr_in clientAddr;
     static socklen_t clientAddrLen;
@@ -146,7 +150,6 @@ esp_err_t discovery_listen(uint8_t current_lamp_state){
     {
         // Data received
         recvBuffer[len] = 0; // NULL terminate buffer
-
         dpacket_struct_t dpacket;
         if (DeserializeBuffer(recvBuffer, len, &dpacket))
         {
@@ -157,16 +160,10 @@ esp_err_t discovery_listen(uint8_t current_lamp_state){
                 node->stype == UINT32_STYPE &&
                 node->data.decimal_v.u32_v > 0)
             {
-                // Validate extra fields, without touching them.
-                if(node->next_node != NULL && node->next_node->stype == UINT32_STYPE &&
-                    node->next_node->data.decimal_v.u32_v > 0)
-                {
-                    // Free packet reference
-                    FreePacket(&dpacket);
-
-                    // Send discovery response
-                    return send_discovery_response(node->data.decimal_v.u32_v, current_lamp_state);
-                }
+                // Free packet reference
+                FreePacket(&dpacket);
+                // Send discovery response
+                return send_discovery_response(node->data.decimal_v.u32_v, current_lamp_state, is_managed);
             }
             // Free packet reference
             FreePacket(&dpacket);

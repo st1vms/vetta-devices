@@ -2,18 +2,19 @@
 #include "packets.h"
 
 static int pingPacketFormat[PING_PACKET_SIZE] = {
-    UINT32_STYPE
+    UINT8_STYPE
 };
 
 static int brokerDiscoveryRequestPacketFormat[BROKER_DISCOVERY_REQUEST_PACKET_SIZE] = {
     UINT32_STYPE,   // Network Address Integer
-    UINT32_STYPE    // App identifier
 };
 
 static int brokerDiscoveryAckPacketFormat[BROKER_DISCOVERY_ACK_PACKET_SIZE] = {
     UINT32_STYPE,   // Network Address Integer
+    UINT32_STYPE,   // Lamp seed
     UINT8_STYPE,    // Lamp model
-    UINT8_STYPE     // Lamp state
+    UINT8_STYPE,    // Lamp state
+    BOOLEAN_STYPE,  // Managed flag
 };
 
 static int provisionPacketFormat[PROVISION_PACKET_SIZE] = {

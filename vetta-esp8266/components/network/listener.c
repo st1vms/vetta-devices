@@ -137,7 +137,7 @@ esp_err_t send_ping(){
         return ESP_FAIL;
     }
 
-    if(!AddSerializable(&dpacket, UINT32_STYPE, (data_union_t){.decimal_v.u32_v = 0}))
+    if(!AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = 0}))
     {
         FreePacket(&dpacket);
         return ESP_FAIL;
@@ -237,7 +237,7 @@ listener_event_t listener_listen(void){
             close_client_socket();
         }
 
-        return RESULT_NO_ACTION;
+        return RESULT_CLIENT_STALE;
     }
 
     printf("\nCLIENT SELECTED\n");
@@ -288,8 +288,9 @@ listener_event_t listener_listen(void){
 
     }else if(ret < 0){
         close_client_socket();
+        return RESULT_NO_ACTION;
     }
 
     printf("\nRECV TIMEOUT\n");
-    return RESULT_NO_ACTION;
+    return RESULT_CLIENT_STALE;
 }

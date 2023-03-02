@@ -16,6 +16,7 @@ extern "C"
     typedef enum listener_event_t{
         RESULT_FAIL = ESP_FAIL,
         RESULT_NO_ACTION = ESP_OK,
+        RESULT_CLIENT_STALE,
         RESULT_LED_OFF,
         RESULT_LED_LOW,
         RESULT_LED_MEDIUM,

@@ -81,6 +81,8 @@ static SemaphoreHandle_t ledAnimationSem = NULL;
 
 static unsigned char cap_sensor_active = 1;
 
+static uint32_t lampSeed = 0;
+
 static inline void TIME_DELAY_MILLIS(long int x) { vTaskDelay(x / portTICK_PERIOD_MS); };
 
 static void led_updater_task(void *params)
@@ -384,7 +386,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         TIME_DELAY_MILLIS(500);
         cap_sensor_active = 1;
 
-        if(ESP_OK == init_discovery_server(ip_info.ip.addr) &&
+        if(ESP_OK == init_discovery_server(ip_info.ip.addr, lampSeed) &&
             ESP_OK == init_listener_server(ip_info.ip.addr))
         {
             sta_connected = 1;
@@ -419,6 +421,9 @@ void shutdown_wifi(void)
 
 static void network_task(void *params)
 {
+    static uint8_t is_managed;
+    is_managed = 0;
+
     static uint32_t networkNotificationValue;
     static esp_err_t _err;
 
@@ -502,12 +507,13 @@ static void network_task(void *params)
             // Network Ops
 
             // Discovery Responder listen call
-            if(ESP_FAIL == discovery_listen(led_get_state())){
+            if(ESP_FAIL == discovery_listen(led_get_state(), is_managed)){
                 printf("\nDISCOVERY SERVER FAILED\n");
                 xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
                 continue;
             }
 
+            is_managed = 0;
             listener_event_t event = listener_listen();
             switch (event)
             {
@@ -515,19 +521,27 @@ static void network_task(void *params)
                 printf("\nDISCOVERY SERVER FAILED\n");
                 xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
                 break;
+            case RESULT_CLIENT_STALE:
+                is_managed = 1;
+                break;
             case RESULT_LED_OFF:
+                is_managed = 1;
                 xTaskNotify(ledUpdaterTask, LED_OFF_EVENT, eSetBits);
                 break;
             case RESULT_LED_LOW:
+                is_managed = 1;
                 xTaskNotify(ledUpdaterTask, LED_LOW_EVENT, eSetBits);
                 break;
             case RESULT_LED_MEDIUM:
+                is_managed = 1;
                 xTaskNotify(ledUpdaterTask, LED_MEDIUM_EVENT, eSetBits);
                 break;
             case RESULT_LED_HIGH:
+                is_managed = 1;
                 xTaskNotify(ledUpdaterTask, LED_HIGH_EVENT, eSetBits);
                 break;
             case RESULT_LED_NEXT:
+                is_managed = 1;
                 xTaskNotify(ledUpdaterTask, LED_NEXT_EVENT, eSetBits);
                 break;
             default:
@@ -581,6 +595,7 @@ void app_main()
     }
     else
     {
+
         network_task_working = 0;
 
         if (!ledStopSem)
@@ -629,8 +644,10 @@ void app_main()
             printf("\nnvs_flash_init() error {%d}\n", _err);
         }
 
-        if (RegisterNetworkPackets())
+        // Initialize packet table and lamp seed
+        if (RegisterNetworkPackets() && ESP_OK == get_lamp_seed(&lampSeed))
         {
+            printf("\nLAMP SEED -> %u\n", lampSeed);
             // Create button task
             xTaskCreate(network_task,
                         "network_task",

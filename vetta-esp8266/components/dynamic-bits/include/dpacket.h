@@ -4,7 +4,7 @@
 #define PACKET_TABLE_SIZE 5
 
 // Max number of fields x packet
-#define MAX_PACKET_FIELDS 5
+#define MAX_PACKET_FIELDS 6
 
 #include "dtypes.h"
 

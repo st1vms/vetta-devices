@@ -20,6 +20,8 @@ extern "C"
 
     } spiffs_string_t;
 
+    esp_err_t get_lamp_seed(uint32_t * out);
+
     esp_err_t get_user_ap_password_string(spiffs_string_t *out_string);
     esp_err_t get_user_ap_ssid_string(spiffs_string_t *out_string);
 
