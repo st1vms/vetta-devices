@@ -9,6 +9,10 @@ extern "C"
 {
 #endif
 
+#define LISTENER_PING_DELAY (5000)
+#define LISTENER_SERVER_SELECT_TIMEOUT (500)
+
+#define LISTENER_PING_STEPS (10)
 #define LISTENER_SERVER_BUFFER_SIZE (128)
 
 #define LISTENER_SERVER_PORT (50032)
@@ -29,6 +33,8 @@ extern "C"
     void close_listener_server(void);
 
     listener_event_t listener_listen(void);
+
+    esp_err_t send_state_ping(void);
 
 #ifdef __cplusplus
 }

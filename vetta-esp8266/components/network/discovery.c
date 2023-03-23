@@ -108,7 +108,7 @@ static esp_err_t send_discovery_response(u32_t networkAddr, uint8_t current_lamp
 }
 
 
-esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed){
+esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed, uint32_t pinCode){
 
     static struct sockaddr_in clientAddr;
     static socklen_t clientAddrLen;
@@ -116,7 +116,7 @@ esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed){
 
     static struct timeval time_out_v;
     time_out_v.tv_sec = 0;
-    time_out_v.tv_usec = 500000; // 500ms
+    time_out_v.tv_usec = DISCOVERY_SERVER_SELECT_TIMEOUT; // 500ms
 
     fd_set set;
 
@@ -160,10 +160,18 @@ esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed){
                 node->stype == UINT32_STYPE &&
                 node->data.decimal_v.u32_v > 0)
             {
+                uint32_t networkAddr = node->data.decimal_v.u32_v;
+                node = node->next_node;
+                if(node == NULL || node->stype != UINT32_STYPE || node->data.decimal_v.u32_v != pinCode){
+                    // Free packet reference
+                    FreePacket(&dpacket);
+                    return ESP_ERR_TIMEOUT;
+                }
+
                 // Free packet reference
                 FreePacket(&dpacket);
                 // Send discovery response
-                return send_discovery_response(node->data.decimal_v.u32_v, current_lamp_state, is_managed);
+                return send_discovery_response(networkAddr, current_lamp_state, is_managed);
             }
             // Free packet reference
             FreePacket(&dpacket);

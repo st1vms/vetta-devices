@@ -12,7 +12,8 @@ static esp_vfs_spiffs_conf_t conf = {
     .base_path = "/spiffs",
     .partition_label = NULL,
     .max_files = 4,
-    .format_if_mount_failed = true};
+    .format_if_mount_failed = true
+};
 
 static size_t totalSize = 0;
 static size_t usedSize = 0;
@@ -20,6 +21,7 @@ static size_t usedSize = 0;
 static const char *user_ap_pwd_filename = "/spiffs/uap.txt";
 static const char *user_ap_ssid_filename = "/spiffs/ssid.txt";
 static const char *lamp_seed_filename = "/spiffs/seed.txt";
+static const char *pin_code_filename = "/spiffs/pin.txt";
 
 static esp_err_t init_spiffs(void)
 {
@@ -113,6 +115,26 @@ static esp_err_t read_lamp_seed(uint32_t * out){
     return ESP_OK;
 }
 
+static esp_err_t read_pin_code(uint32_t * out){
+
+    FILE *fp = fopen(pin_code_filename, "r");
+    if (!fp){
+        return ESP_FAIL;
+    }
+
+    uint32_t tmp = 0;
+    if(1 != fread(&tmp, sizeof(uint32_t), 1, fp))
+    {
+        fclose(fp);
+        unlink(pin_code_filename);
+        return ESP_FAIL;
+    }
+
+    *out = tmp;
+    fclose(fp);
+    return ESP_OK;
+}
+
 static esp_err_t gen_lamp_seed(uint32_t * out){
 
     uint32_t tmp = 0;
@@ -137,6 +159,26 @@ static esp_err_t gen_lamp_seed(uint32_t * out){
     return ESP_FAIL;
 }
 
+static esp_err_t write_pin_code(uint32_t pinCode){
+
+
+    FILE *fp = fopen(pin_code_filename, "w");
+    if (!fp){
+        return ESP_FAIL;
+    }
+
+    uint32_t tmp = pinCode;
+    if(1 != fwrite(&tmp, sizeof(uint32_t), 1, fp))
+    {
+        fclose(fp);
+        unlink(pin_code_filename);
+        return ESP_FAIL;
+    }
+    fclose(fp);
+
+    return ESP_OK;
+}
+
 esp_err_t get_lamp_seed(uint32_t * out){
 
     if (ESP_OK == init_spiffs())
@@ -144,6 +186,21 @@ esp_err_t get_lamp_seed(uint32_t * out){
         if(ESP_OK == read_lamp_seed(out) ||
             ESP_OK == gen_lamp_seed(out))
         {
+            esp_vfs_spiffs_unregister(NULL);
+            return ESP_OK;
+        }
+        esp_vfs_spiffs_unregister(NULL);
+    }
+    return ESP_FAIL;
+}
+
+esp_err_t get_pin_code(uint32_t * pinCode){
+    if (ESP_OK == init_spiffs())
+    {
+        uint32_t i = 0;
+        if(ESP_OK == read_pin_code(&i))
+        {
+            *pinCode = i;
             esp_vfs_spiffs_unregister(NULL);
             return ESP_OK;
         }
@@ -226,6 +283,21 @@ esp_err_t save_user_ap_ssid(const uint8_t *ap_ssid, size_t ssid_length)
     return _err;
 }
 
+esp_err_t save_pin_code(uint32_t pinCode)
+{
+    static esp_err_t _err;
+
+    if (ESP_OK == (_err = init_spiffs()))
+    {
+        if(ESP_OK == write_pin_code(pinCode)){
+            esp_vfs_spiffs_unregister(NULL);
+            return ESP_OK;
+        }
+        esp_vfs_spiffs_unregister(NULL);
+    }
+    return _err;
+}
+
 void spiffs_data_reset(void)
 {
     static esp_err_t _err;
@@ -235,6 +307,8 @@ void spiffs_data_reset(void)
         unlink(user_ap_ssid_filename);
 
         unlink(user_ap_pwd_filename);
+
+        unlink(pin_code_filename);
 
         esp_vfs_spiffs_unregister(NULL);
     }

@@ -80,7 +80,7 @@ esp_err_t init_listener_server(u32_t ip){
     memset(&serverAddr, 0, sizeof(serverAddr));
 
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = 0;
+    serverAddr.sin_addr.s_addr = ip;
     serverAddr.sin_port = htons(LISTENER_SERVER_PORT);
 
     int ret = bind(server_socket, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
@@ -126,7 +126,7 @@ void close_listener_server(void)
     }
 }
 
-esp_err_t send_ping(){
+esp_err_t send_ping(uint8_t isStatePing){
 
     if(client_socket == -1 || ssl_session == NULL){
         return ESP_FAIL;
@@ -137,7 +137,7 @@ esp_err_t send_ping(){
         return ESP_FAIL;
     }
 
-    if(!AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = 0}))
+    if(!AddSerializable(&dpacket, UINT8_STYPE, (data_union_t){.decimal_v.u8_v = isStatePing}))
     {
         FreePacket(&dpacket);
         return ESP_FAIL;
@@ -160,11 +160,17 @@ esp_err_t send_ping(){
     return ESP_OK;
 }
 
+esp_err_t send_state_ping(void){
+    printf("\nSENDING STATE PING\n");
+    return send_ping(1);
+}
+
 listener_event_t listener_listen(void){
 
+    static uint8_t timeout_count = 0;
     static struct timeval time_out_v;
     time_out_v.tv_sec = 0;
-    time_out_v.tv_usec = 500000; // 500ms
+    time_out_v.tv_usec = LISTENER_SERVER_SELECT_TIMEOUT; // 500ms
 
     fd_set server_set, client_set;
 
@@ -227,14 +233,21 @@ listener_event_t listener_listen(void){
     ret = select(client_socket + 1, &client_set, NULL, NULL, &time_out_v);
     if (ret == -1){
         // Select Error
+        close_client_socket();
         return RESULT_FAIL;
     }
     else if (ret == 0){
         // Select timeout
 
         // Send Ping
-        if(ESP_OK != send_ping()){
-            close_client_socket();
+        if(timeout_count >= LISTENER_PING_STEPS){
+            printf("\nSending ping\n");
+            if(ESP_OK != send_ping(0)){
+                close_client_socket();
+            }
+            timeout_count = 0;
+        }else{
+            timeout_count++;
         }
 
         return RESULT_CLIENT_STALE;
@@ -291,6 +304,5 @@ listener_event_t listener_listen(void){
         return RESULT_NO_ACTION;
     }
 
-    printf("\nRECV TIMEOUT\n");
     return RESULT_CLIENT_STALE;
 }

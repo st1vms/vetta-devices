@@ -7,6 +7,7 @@ static int pingPacketFormat[PING_PACKET_SIZE] = {
 
 static int brokerDiscoveryRequestPacketFormat[BROKER_DISCOVERY_REQUEST_PACKET_SIZE] = {
     UINT32_STYPE,   // Network Address Integer
+    UINT32_STYPE    // Pin Code
 };
 
 static int brokerDiscoveryAckPacketFormat[BROKER_DISCOVERY_ACK_PACKET_SIZE] = {
@@ -18,8 +19,9 @@ static int brokerDiscoveryAckPacketFormat[BROKER_DISCOVERY_ACK_PACKET_SIZE] = {
 };
 
 static int provisionPacketFormat[PROVISION_PACKET_SIZE] = {
-    UTF8_STRING_STYPE, // SSID
-    UTF8_STRING_STYPE  // AP Password
+    UTF8_STRING_STYPE,  // SSID
+    UTF8_STRING_STYPE,  // AP Password
+    UINT32_STYPE        // Pin Code
 };
 
 static int lampStateChangePacketFormat[LAMP_STATE_CHANGE_PACKET_SIZE] = {

@@ -15,7 +15,7 @@ extern "C"
 
 #define READING_DELAY_MILLIS_CALIBRATION (40)
 
-#define TOUCH_DETECTION_TRESHOLD (8)
+#define TOUCH_DETECTION_TRESHOLD (18)
 
     /* Configures capacitive touch sensor module (non-thread safe)
     @return ESP_OK on success, esp_err_t value in case of errors

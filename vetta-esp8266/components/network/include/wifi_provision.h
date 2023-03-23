@@ -14,7 +14,7 @@ extern "C"
 
     esp_err_t init_wifi_provision(void);
     void deinit_wifi_provision(void);
-    esp_err_t provision_listen(spiffs_string_t *ussid, spiffs_string_t *upwd);
+    esp_err_t provision_listen(spiffs_string_t *ussid, spiffs_string_t *upwd, uint32_t * pinCode);
 
 #ifdef __cplusplus
 }

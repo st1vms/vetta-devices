@@ -2,12 +2,14 @@
 
 #include "esp_err.h"
 #include "esp_event.h"
+#include "sys/socket.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
+#define DISCOVERY_SERVER_SELECT_TIMEOUT (500)
 #define LAMP_MODEL_INTEGER 0
 #define DISCOVERY_SERVER_PORT 50005
 #define BROKER_DISCOVERY_SERVER_PORT 50000
@@ -17,7 +19,7 @@ extern "C"
 
     void close_discovery_server(void);
 
-    esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed);
+    esp_err_t discovery_listen(uint8_t current_lamp_state, uint8_t is_managed, uint32_t pinCode);
 
 #ifdef __cplusplus
 }
