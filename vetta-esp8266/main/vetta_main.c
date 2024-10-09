@@ -19,17 +19,34 @@
 #include "packets.h"
 #include "wifi_manager.h"
 #include "wifi_provision.h"
+#include "discovery.h"
+#include "listener.h"
 
 // Sensors Events
 
-#define CAPACITIVE_SENSOR_LED_EVENT_WAIT (0x01)
-#define CAPACITIVE_SENSOR_LED_EVENT (1UL << 0UL)
+#define LED_NEXT_EVENT_WAIT (0x01)
+#define LED_NEXT_EVENT (1UL << 0UL)
 
 #define LED_BLINK_START_EVENT_WAIT (0x02)
 #define LED_BLINK_START_EVENT (1UL << 1UL)
 
 #define LED_BLINK_LOOP_START_EVENT_WAIT (0x04)
 #define LED_BLINK_LOOP_START_EVENT (1UL << 2UL)
+
+#define LED_OFF_EVENT_WAIT (0x08)
+#define LED_OFF_EVENT (1UL << 3UL)
+
+#define LED_LOW_EVENT_WAIT (0x10)
+#define LED_LOW_EVENT (1UL << 4UL)
+
+#define LED_MEDIUM_EVENT_WAIT (0x20)
+#define LED_MEDIUM_EVENT (1UL << 5UL)
+
+#define LED_HIGH_EVENT_WAIT (0x40)
+#define LED_HIGH_EVENT (1UL << 6UL)
+
+#define LED_NEXT_NETWORK_EVENT_WAIT (0x80)
+#define LED_NEXT_NETWORK_EVENT (1UL << 7UL)
 
 #define BUTTON_INTR_EVENT_WAIT (0x01)
 #define BUTTON_INTR_EVENT (1UL << 0UL)
@@ -50,9 +67,6 @@
 #define WIFI_START_STA_EVENT_WAIT (0x10)
 #define WIFI_START_STA_EVENT (1UL << 4UL)
 
-#define WIFI_STA_CONNECTED_EVENT_WAIT (0x20)
-#define WIFI_STA_CONNECTED_EVENT (1UL << 5UL)
-
 /* FreeRTOS event group to signal network events*/
 
 static const UBaseType_t LED_SENSOR_TASK_PRIORITY = 7;
@@ -70,6 +84,10 @@ static SemaphoreHandle_t ledAnimationSem = NULL;
 
 static unsigned char cap_sensor_active = 1;
 
+static uint32_t lampSeed = 0;
+
+static uint32_t pinCode = 0;
+
 static inline void TIME_DELAY_MILLIS(long int x) { vTaskDelay(x / portTICK_PERIOD_MS); };
 
 static void led_updater_task(void *params)
@@ -78,13 +96,13 @@ static void led_updater_task(void *params)
 
     for (;;)
     {
-        if (xTaskNotifyWait(0x00,                  /* Don't clear any notification bits on entry. */
+        if (xTaskNotifyWait(0x0UL,           /* Don't clear any notification bits on entry. */
                             0xffffffffUL,          /* Reset the notification value to 0 on exit. */
                             &ledNotificationValue, /* Notified value */
                             portMAX_DELAY) == pdTRUE)
         {
 
-            if (ledNotificationValue & CAPACITIVE_SENSOR_LED_EVENT_WAIT)
+            if (ledNotificationValue & LED_NEXT_EVENT_WAIT || ledNotificationValue & LED_NEXT_NETWORK_EVENT)
             {
                 // Led update from sensor
                 led_set_next();
@@ -104,6 +122,18 @@ static void led_updater_task(void *params)
                     play_led_animation(ledStopSem, ledAnimationSem);
                     led_off();
                 }
+            }else if (ledNotificationValue & LED_OFF_EVENT_WAIT)
+            {
+                led_off();
+            }else if (ledNotificationValue & LED_LOW_EVENT_WAIT)
+            {
+                led_low();
+            }else if (ledNotificationValue & LED_MEDIUM_EVENT_WAIT)
+            {
+                led_medium();
+            }else if (ledNotificationValue & LED_HIGH_EVENT_WAIT)
+            {
+                led_high();
             }
         }
     }
@@ -112,7 +142,7 @@ static void led_updater_task(void *params)
 // Activate to log capacitive sensor readings
 //#define LOG_CAP_SENSOR
 #ifdef LOG_CAP_SENSOR
-    static const unsigned long int debug_rate_millis = 500;
+    static const unsigned long int debug_rate_millis = READING_DELAY_MILLIS;
     static TickType_t debug_start = 0, debug_end = 0;
 #endif
 
@@ -175,8 +205,9 @@ static void capacitive_sensor_task(void *params)
                 can_update_led = 0;
                 time_offset = 0;
 
+                printf("\nCAP SENSOR NOTIFY avg: %u | idle: %u\n", total / READING_SAMPLES_POOL_SIZE, idle_read);
                 // send led update event from sensor task
-                xTaskNotify(ledUpdaterTask, CAPACITIVE_SENSOR_LED_EVENT, eSetBits);
+                xTaskNotify(ledUpdaterTask, LED_NEXT_EVENT, eSetBits);
             }
         }
 
@@ -203,6 +234,8 @@ static void button_isr_handler(void *args)
     portEND_SWITCHING_ISR(xHigherPriorityTaskWoken);
 }
 
+static unsigned char is_provisioning = 0;
+static unsigned char credentials_ok = 0;
 static unsigned char ap_credentials_available = 0;
 static spiffs_string_t upwd;
 static spiffs_string_t ussid;
@@ -211,6 +244,7 @@ static void reset_persistent_storage(void)
     // Reset SPIFFS persistent storage
     spiffs_data_reset();
     ap_credentials_available = 0;
+    credentials_ok = 0;
 
     // Clear references
     if (ussid.string_array != NULL)
@@ -243,10 +277,10 @@ static void button_task(void *params)
                 switch (get_press_event())
                 {
                 case PRESS_EVENT_RESET:
-
                     xTaskNotify(ledUpdaterTask, LED_BLINK_START_EVENT, eSetBits);
 
-                    reset_persistent_storage();
+                    // TODO renable this
+                    //reset_persistent_storage();
 
                     // Delay one second before shutting down wifi and led animation
                     TIME_DELAY_MILLIS(1000);
@@ -254,10 +288,11 @@ static void button_task(void *params)
                     xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
                     break;
                 case PRESS_EVENT_DISCOVERY:
-
-                    reset_persistent_storage();
-
-                    xTaskNotify(networkTask, WIFI_START_AP_EVENT, eSetBits);
+                    if(!is_provisioning && (!credentials_ok || !ap_credentials_available)){
+                        // TODO renable this
+                        //reset_persistent_storage();
+                        xTaskNotify(networkTask, WIFI_START_AP_EVENT, eSetBits);
+                    }
                     break;
                 default:
                     break;
@@ -267,13 +302,15 @@ static void button_task(void *params)
     }
 }
 
-static unsigned char network_task_working = 0;
-static unsigned char is_provisioning = 0;
-static unsigned char sta_connected = 0;
+#define TIME_DELAY_RECONNECTION_MILLIS 3000
+#define MAX_CONNECTION_RETRIES 2
+static unsigned char connection_retries = 0;
+
 static tcpip_adapter_ip_info_t ip_info;
-static wifi_event_ap_staconnected_t *event_ap_staconnected;
-static wifi_event_ap_stadisconnected_t *event_ap_stadisconnected;
-static int s_retry_num = 0;
+static unsigned char network_task_working = 0;
+static unsigned char sta_connected = 0;
+static wifi_event_ap_staconnected_t *event_ap_staconnected = NULL;
+static wifi_event_ap_stadisconnected_t *event_ap_stadisconnected = NULL;
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
@@ -295,15 +332,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
-        /* if(cap_sensor_active){
-            cap_sensor_active = 0;
-            TIME_DELAY_MILLIS(200);
-        } */
         printf("\nCONNECTING TO WIFI\n");
-
-        // Lamp starting station connection to home AP
-        esp_wifi_connect();
-
+        if(credentials_ok == 0){
+            credentials_ok = (ESP_OK == esp_wifi_connect()) ? 1: 0;
+            if(credentials_ok){
+                printf("\nCREDENTIALS OK!\n");
+            }
+        }else{
+            esp_wifi_connect();
+        }
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
@@ -313,35 +350,57 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         sta_connected = 0;
 
-        // TODO Implement reconnection
-        ap_credentials_available = 0;
+        if(ap_credentials_available &&
+            connection_retries < MAX_CONNECTION_RETRIES){
+            // Reconnection attempt
+            if(ESP_OK == esp_wifi_connect()){
+                credentials_ok = 1;
+            }
+            connection_retries++;
+        }else if(credentials_ok &&
+            ap_credentials_available){
+            // Connection was successfull once
+            // Retrying until credentials are available
+            connection_retries = 0;
+            if(ESP_OK != esp_wifi_connect()){
+                // Extending delay time after failure;
+                TIME_DELAY_MILLIS(TIME_DELAY_RECONNECTION_MILLIS);
+            }
+        }/* else if(!credentials_ok){
+            if(network_task_working){
+                xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+            }
+            if(ap_credentials_available){
+                reset_persistent_storage();
+            }
+        } */
 
-        xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
-
-        if(!cap_sensor_active){
-            TIME_DELAY_MILLIS(1000);
-            cap_sensor_active = 1;
-        }
-
+        TIME_DELAY_MILLIS(1000);
+        cap_sensor_active = 1;
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         // Lamp station received an IP address from home AP
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-
         if(event->ip_changed){
             ip_info = event->ip_info;
         }
 
-        ESP_LOGI("WIFI STA", "Got IP: %s",
-                ip4addr_ntoa(&ip_info.ip));
+        printf("\nSTATION CONNECTED, IP: %s\n", ip4addr_ntoa(&ip_info.ip));
 
-        s_retry_num = 0;
-        xTaskNotify(networkTask, WIFI_STA_CONNECTED_EVENT, eSetBits);
-        if(!cap_sensor_active){
-            TIME_DELAY_MILLIS(1000);
-            cap_sensor_active = 1;
-        }
+        connection_retries = 0;
+
+        TIME_DELAY_MILLIS(500);
+        cap_sensor_active = 1;
+
+        if(ESP_OK == init_discovery_server(ip_info.ip.addr, lampSeed) &&
+            ESP_OK == init_listener_server(ip_info.ip.addr))
+        {
+            sta_connected = 1;
+        }/* else{
+            reset_persistent_storage();
+            xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+        } */
     }
 }
 
@@ -350,18 +409,28 @@ void shutdown_wifi(void)
     if (network_task_working)
     {
         printf("\nWIFI CLOSING\n");
-        network_task_working = 0;
         if (is_provisioning)
         {
             deinit_wifi_provision();
         }
         is_provisioning = 0;
+
+        if(sta_connected){
+            close_discovery_server();
+            close_listener_server();
+        }
+        sta_connected = 0;
+
         deinit_wifi(&wifi_event_handler);
     }
+    network_task_working = 0;
 }
 
 static void network_task(void *params)
 {
+    static uint8_t is_managed;
+    is_managed = 0;
+
     static uint32_t networkNotificationValue;
     static esp_err_t _err;
 
@@ -370,7 +439,6 @@ static void network_task(void *params)
 
     for (;;)
     {
-
         if (xTaskNotifyWait(0x00,                      /* Don't clear any notification bits on entry. */
                             0xffffffffUL,              /* Reset the notification value to 0 on exit. */
                             &networkNotificationValue, /* Notified value */
@@ -428,9 +496,8 @@ static void network_task(void *params)
                 printf("\nSTATION START EVENT FIRED\n");
 
                 cap_sensor_active = 0;
-                TIME_DELAY_MILLIS(500); // Give time to cap sensor for deactivating
+                TIME_DELAY_MILLIS(1000); // Give time to cap sensor for deactivating
 
-                //shutdown_wifi();
                 if (ap_credentials_available &&
                     ESP_OK == init_wifi_sta(&wifi_event_handler,
                                             ussid.string_array, ussid.string_len,
@@ -440,15 +507,68 @@ static void network_task(void *params)
                     network_task_working = 1;
                 }
             }
-            else if (networkNotificationValue & WIFI_STA_CONNECTED_EVENT_WAIT)
-            {
-                sta_connected = 1;
-            }
         }
 
         if (sta_connected && network_task_working)
         {
-            printf("\nSTATION CONNECTED, IP: %s\n", ip4addr_ntoa(&ip_info.ip));
+            // Network Ops
+
+            // Discovery Responder listen call
+            if(ESP_FAIL == discovery_listen(led_get_state(), is_managed, pinCode)){
+                printf("\nDISCOVERY SERVER FAILED\n");
+                xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                continue;
+            }
+
+            is_managed = 0;
+            listener_event_t event = listener_listen();
+            switch (event)
+            {
+            case RESULT_FAIL:
+                printf("\nDISCOVERY SERVER FAILED\n");
+                xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                break;
+            case RESULT_CLIENT_STALE:
+                is_managed = 1;
+                break;
+            case RESULT_LED_OFF:
+                is_managed = 1;
+                xTaskNotify(ledUpdaterTask, LED_OFF_EVENT, eSetBits);
+                if(ESP_OK != send_state_ping()){
+                    xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                }
+                break;
+            case RESULT_LED_LOW:
+                is_managed = 1;
+                xTaskNotify(ledUpdaterTask, LED_LOW_EVENT, eSetBits);
+                if(ESP_OK != send_state_ping()){
+                    xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                }
+                break;
+            case RESULT_LED_MEDIUM:
+                is_managed = 1;
+                xTaskNotify(ledUpdaterTask, LED_MEDIUM_EVENT, eSetBits);
+                if(ESP_OK != send_state_ping()){
+                    xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                }
+                break;
+            case RESULT_LED_HIGH:
+                is_managed = 1;
+                xTaskNotify(ledUpdaterTask, LED_HIGH_EVENT, eSetBits);
+                if(ESP_OK != send_state_ping()){
+                    xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                }
+                break;
+            case RESULT_LED_NEXT:
+                is_managed = 1;
+                xTaskNotify(ledUpdaterTask, LED_NEXT_NETWORK_EVENT, eSetBits);
+                if(ESP_OK != send_state_ping()){
+                    xTaskNotify(networkTask, WIFI_SHUTDOWN_EVENT, eSetBits);
+                }
+                break;
+            default:
+                break;
+            }
         }
         else if (ap_credentials_available && !network_task_working)
         {
@@ -459,7 +579,7 @@ static void network_task(void *params)
         {
             // Wifi provisioning semi-blocking listen
             printf("\nListening for provision...\n");
-            if (ESP_ERR_TIMEOUT == (_err = provision_listen(&ussid, &upwd)))
+            if (ESP_ERR_TIMEOUT == (_err = provision_listen(&ussid, &upwd, &pinCode)))
             {
                 continue;
             }
@@ -468,10 +588,12 @@ static void network_task(void *params)
                 // Retrieved SSID and password, ending provisioning
 
                 if (ESP_OK == save_user_ap_ssid(ussid.string_array, ussid.string_len) &&
-                    ESP_OK == save_user_ap_password(upwd.string_array, upwd.string_len))
+                    ESP_OK == save_user_ap_password(upwd.string_array, upwd.string_len) &&
+                    ESP_OK == save_pin_code(pinCode))
                 {
                     printf("\nWifi Credentials retrieved!\n");
                     printf("\nSSID -> %s\nPassword -> %s\n", ussid.string_array, upwd.string_array);
+                    printf("\nPIN CODE -> %u\n", pinCode);
                     ap_credentials_available = 1;
                 }
             }
@@ -487,7 +609,7 @@ void app_main()
     static esp_err_t _err;
 
     // Initialize led module and capacitive sensor module, set the led to low
-    if (ESP_OK != (_err = init_led_module()) || ESP_OK != (_err = led_low()))
+    if (ESP_OK != (_err = init_led_module()) || ESP_OK != (_err = led_off()))
     {
         printf("\ninit_led_module() error {%d}\n", _err);
     }
@@ -497,6 +619,7 @@ void app_main()
     }
     else
     {
+
         network_task_working = 0;
 
         if (!ledStopSem)
@@ -545,8 +668,10 @@ void app_main()
             printf("\nnvs_flash_init() error {%d}\n", _err);
         }
 
-        if (RegisterNetworkPackets())
+        // Initialize packet table and lamp seed
+        if (RegisterNetworkPackets() && ESP_OK == get_lamp_seed(&lampSeed))
         {
+            printf("\nLAMP SEED -> %u\n", lampSeed);
             // Create button task
             xTaskCreate(network_task,
                         "network_task",
@@ -557,8 +682,10 @@ void app_main()
         }
 
         if (ESP_OK == get_user_ap_ssid_string(&ussid) &&
-            ESP_OK == get_user_ap_password_string(&upwd))
+            ESP_OK == get_user_ap_password_string(&upwd) &&
+            ESP_OK == get_pin_code(&pinCode))
         {
+            printf("\nPIN CODE -> %u\n", pinCode);
             ap_credentials_available = 1;
             xTaskNotify(networkTask, WIFI_START_STA_EVENT, eSetBits);
             printf("\nWIFI credentials set\n");

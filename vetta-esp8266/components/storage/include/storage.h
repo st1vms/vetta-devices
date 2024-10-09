@@ -20,11 +20,15 @@ extern "C"
 
     } spiffs_string_t;
 
+    esp_err_t get_lamp_seed(uint32_t * out);
+
     esp_err_t get_user_ap_password_string(spiffs_string_t *out_string);
     esp_err_t get_user_ap_ssid_string(spiffs_string_t *out_string);
+    esp_err_t get_pin_code(uint32_t * pinCode);
 
     esp_err_t save_user_ap_password(const uint8_t *ap_pwd, size_t pwd_length);
     esp_err_t save_user_ap_ssid(const uint8_t *ap_ssid, size_t ssid_length);
+    esp_err_t save_pin_code(uint32_t pinCode);
 
     void spiffs_data_reset(void);
 

@@ -5,7 +5,6 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <lwip/netdb.h>
-#include "lwip/ip_addr.h"
 #include "dbits.h"
 #include "packets.h"
 #include "wifi_provision.h"
@@ -49,7 +48,7 @@ void deinit_wifi_provision(void)
     }
 }
 
-esp_err_t provision_listen(spiffs_string_t *ussid, spiffs_string_t *upwd)
+esp_err_t provision_listen(spiffs_string_t *ussid, spiffs_string_t *upwd, uint32_t * pinCode)
 {
     static struct sockaddr_in clientAddr;
     static socklen_t clientAddrLen;
@@ -131,11 +130,16 @@ esp_err_t provision_listen(spiffs_string_t *ussid, spiffs_string_t *upwd)
                     upwd->string_len = 0;
                 }
 
-                // Free packet reference
-                FreePacket(&dpacket);
+                // Get Pin Code ( 6 digits )
+                serializable_list_node_t *n = dpacket.data_list.first_node->next_node->next_node;
+                if(n != NULL && n->stype == UINT32_STYPE && n->data.decimal_v.u32_v > 99999){
+                    *pinCode = n->data.decimal_v.u32_v;
+                    // Free packet reference
+                    FreePacket(&dpacket);
 
-                // Return success
-                return ESP_OK;
+                    // Return success
+                    return ESP_OK;
+                }
             }
 
             // Free packet reference
